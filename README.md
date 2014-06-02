@@ -1,2 +1,2 @@
-MyExpensesCore
+My Expenses Core Server
 ==============
