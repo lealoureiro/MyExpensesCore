@@ -1,0 +1,17 @@
+{application, expenses_gateway, [
+  {description, "Expenses Gateway"},
+  {vsn, "0.1.0"},
+  {modules, []},
+  {registered, [expenses_gateway_sup]},
+  {applications, [
+    kernel,
+    stdlib,
+    cowboy,
+    jiffy,
+    mnesia,
+    mysql_client,
+    ssl
+  ]},
+  {mod, {expenses_gateway_app, []}},
+  {env, []}
+]}.
