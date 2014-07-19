@@ -9,8 +9,13 @@
     cowboy,
     jiffy,
     mnesia,
-    mysql_client,
-    ssl
+    ssl,
+    cqerl,
+    pooler,
+    snappy,
+    lz4,
+    semver,
+    uuid
   ]},
   {mod, {expenses_gateway_app, []}},
   {env, []}

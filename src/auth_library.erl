@@ -9,41 +9,96 @@
 -module(auth_library).
 -author("leandroloureiro").
 
--include("deps/mysql_client/include/mysql_types.hrl").
 -include("include/sessions_records.hrl").
+-include("deps/cqerl/include/cqerl.hrl").
 
 %% API
--export([login/2, auth/1, logout/1]).
+-export([login/2, auth/1, logout/1, get_user_id/1, get_user_data/1, show_sessions/0]).
 
+login(Username, Password) when is_list(Username) ->
+  login(list_to_binary(Username), Password);
 
 login(Username, Password) ->
   HashPassword = crypto:hash(sha512, Password),
-  HashPasswordString = hexstring(HashPassword),
-  Con = datasource:get_connection(mysql_datasource),
-  Statement = connection:get_prepared_statement_handle(Con, "SELECT id,username,name FROM Users WHERE username = ? AND password = ?"),
-  {_, Rows} = connection:execute_statement(Con, Statement, [?MYSQL_TYPE_STRING, ?MYSQL_TYPE_STRING], [Username, HashPasswordString]),
-  datasource:return_connection(mysql_datasource, Con),
-  case Rows of
-    [] ->
-      not_found;
-    [Entry | _] ->
-      [Id, _, Name] = Entry,
-      case createSession(Id) of
-        {ok, Token} ->
-          {Token, Id, Name};
+  HashPasswordString = list_to_binary(hexstring(HashPassword)),
+  case get_user_id(Username) of
+    {ok, UserId} ->
+      case get_user_data(UserId) of
+        {ok, Username, HashPasswordString, Name} ->
+          case createSession(UserId) of
+            {ok, Token} ->
+              {Token, list_to_binary(uuid:uuid_to_string(UserId)), Name};
+            _ ->
+              {error}
+          end;
+        error ->
+          error;
         _ ->
-          {error}
-      end
-
+          invalid_password
+      end;
+    Other ->
+      Other
   end.
 
-createSession(Client_Id) ->
-  Token_Bytes = crypto:strong_rand_bytes(64),
-  Token = base64:encode(Token_Bytes),
+get_user_id(Username) ->
+  case cqerl:new_client() of
+    {ok, Client} ->
+      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT user_id FROM finances_core.users_by_username WHERE username = ?;">>, values = [{username, Username}]}) of
+        {ok, Result} ->
+          Row = cqerl:head(Result),
+          cqerl:close_client(Client),
+          case Row of
+            empty_dataset ->
+              not_found;
+            _ ->
+              UserId = proplists:get_value(user_id, Row),
+              {ok, UserId}
+          end;
+        _ ->
+          cqerl:close_client(Client),
+          error
+      end;
+    _ ->
+      error
+  end.
+
+get_user_data(UserId) ->
+  case uuid:is_uuid(UserId) of
+    true ->
+      case cqerl:new_client() of
+        {ok, Client} ->
+          case cqerl:run_query(Client, #cql_query{statement = <<"SELECT username,password,name FROM finances_core.users WHERE user_id = ?;">>, values = [{user_id, UserId}]}) of
+            {ok, Result} ->
+              Row = cqerl:head(Result),
+              case Row of
+                empty_dataset ->
+                  not_found;
+                _ ->
+                  cqerl:close_client(Client),
+                  Username = proplists:get_value(username, Row),
+                  Password = proplists:get_value(password, Row),
+                  Name = proplists:get_value(name, Row),
+                  {ok, Username, Password, Name}
+              end;
+            _ ->
+              cqerl:close_client(Client),
+              error
+          end;
+        _ ->
+          error
+      end;
+    false ->
+      error
+  end.
+
+
+createSession(ClientId) ->
+  TokenBytes = crypto:strong_rand_bytes(64),
+  Token = base64:encode(TokenBytes),
   Timestamp = unixTimeStamp(),
   End = Timestamp + 300,
   Fun = fun() ->
-    mnesia:write(#sessions{token = Token, client_id = Client_Id, started = Timestamp, ended = 0, last_heart_beat = End, valid = 1})
+    mnesia:write(#sessions{token = Token, client_id = ClientId, started = Timestamp, ended = 0, last_heart_beat = End, valid = 1})
   end,
   Result = mnesia:transaction(Fun),
   case Result of
@@ -109,3 +164,15 @@ unixTimeStamp() ->
   Timestamp.
 
 
+show_sessions() ->
+  Sessions = mnesia:async_dirty(fun() -> qlc:e(mnesia:table(sessions)) end),
+  show_session_record(Sessions).
+
+show_session_record([H | Tail]) ->
+  #sessions{token = T, client_id = C, started = S, ended = E, last_heart_beat = L, valid = V} = H,
+  Uiid = uuid:uuid_to_string(C),
+  io:format("User: ~s~nToken: ~s~nStarted: ~B    Last Activity: ~B     Ended: ~B     Valid: ~B~n~n", [Uiid, T, S, L, E, V]),
+  show_session_record(Tail);
+
+show_session_record([]) ->
+  ok.

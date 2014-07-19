@@ -48,23 +48,31 @@ process(<<"/expenses/echo">>, _, PostVals, Req) ->
 
 process(<<"/expenses/get_transactions">>, ClientId, PostVals, Req) ->
   Acct = proplists:get_value(<<"acct">>, PostVals),
+  io:format("Processing transactions, Client ~s Acccount: ~s ~n", [uuid:uuid_to_string(ClientId), Acct]),
   case Acct of
     undefined ->
       missing_parameter(Req);
     _ ->
-      {AcctId, _} = string:to_integer(binary_to_list(Acct)),
-      Transactions = expenses_library:get_transactions(ClientId, AcctId),
+      Transactions = expenses_library:get_transactions(ClientId, Acct),
       case Transactions of
         not_found ->
           cowboy_req:reply(403, Req);
+        access_denied ->
+          cowboy_req:reply(403, Req);
         [_ | _] ->
           Mapping = fun(Transaction) ->
-            [Id, Description, AcctId, CtgID, SubCtgId, Datetime, Amt, ExtRef] = Transaction,
+            Id = list_to_binary(uuid:uuid_to_string(proplists:get_value(transaction_id, Transaction))),
+            Description = proplists:get_value(description, Transaction),
+            CtgID = proplists:get_value(category, Transaction),
+            SubCtgId = proplists:get_value(sub_category, Transaction),
+            Datetime = proplists:get_value(date, Transaction),
+            Amt = proplists:get_value(amount, Transaction),
+            ExtRef = proplists:get_value(external_reference, Transaction),
             case ExtRef of
-              null ->
-                {[{<<"id">>, Id}, {<<"desc">>, erlang:list_to_binary(Description)}, {<<"accId">>, AcctId}, {<<"ctgId">>, CtgID}, {<<"subCtgId">>, SubCtgId}, {<<"datetime">>, Datetime}, {<<"amt">>, Amt}, {<<"extRef">>, null}]};
+              undefined ->
+                {[{<<"id">>, Id}, {<<"desc">>, Description}, {<<"ctgId">>, CtgID}, {<<"subCtgId">>, SubCtgId}, {<<"datetime">>, Datetime}, {<<"amt">>, Amt}, {<<"extRef">>, null}]};
               _ ->
-                {[{<<"id">>, Id}, {<<"desc">>, erlang:list_to_binary(Description)}, {<<"accId">>, AcctId}, {<<"ctgId">>, CtgID}, {<<"subCtgId">>, SubCtgId}, {<<"datetime">>, Datetime}, {<<"amt">>, Amt}, {<<"extRef">>, erlang:list_to_binary(ExtRef)}]}
+                {[{<<"id">>, Id}, {<<"desc">>, Description}, {<<"ctgId">>, CtgID}, {<<"subCtgId">>, SubCtgId}, {<<"datetime">>, Datetime}, {<<"amt">>, Amt}, {<<"extRef">>, ExtRef}]}
             end
           end,
           Data = lists:map(Mapping, Transactions),
@@ -77,11 +85,21 @@ process(<<"/expenses/get_transactions">>, ClientId, PostVals, Req) ->
   end;
 
 process(<<"/expenses/get_accounts">>, ClientId, _, Req) ->
-  Data = expenses_library:get_accounts(ClientId),
-  case Data of
+  Accounts = expenses_library:get_accounts(ClientId),
+  case Accounts of
     not_found ->
       reply([], Req);
     [_ | _] ->
+      Map = fun(Account) ->
+        AccountId = list_to_binary(uuid:uuid_to_string(proplists:get_value(account_id, Account))),
+        AccountName = proplists:get_value(name, Account),
+        AcctType = proplists:get_value(account_type, Account),
+        StartBalance = proplists:get_value(start_balance, Account),
+        Currency = proplists:get_value(currency, Account),
+        Balance = proplists:get_value(balance, Account),
+        {[{<<"acct">>, AccountId}, {<<"name">>, AccountName}, {<<"type">>, AcctType}, {<<"startBal">>, StartBalance}, {<<"cur">>, Currency}, {<<"bal">>, Balance}]}
+      end,
+      Data = lists:map(Map, Accounts),
       reply(Data, Req);
     _ ->
       cowboy_req:reply(500, Req)
@@ -91,17 +109,26 @@ process(<<"/expenses/get_accounts">>, ClientId, _, Req) ->
 process(<<"/expenses/get_categories">>, _, _, Req) ->
   Categories = expenses_library:get_all_categories(),
   SubCategories = expenses_library:get_all_subcategories(),
-  Tags = expenses_library:get_all_tags(),
-  Map1 = fun([CategoryId, Description]) -> {[{<<"id">>, CategoryId}, {<<"dsc">>, Description}]} end,
-  Map2 = fun([Id, Description, CategoryId]) ->
-    {[{<<"id">>, Id}, {<<"dsc">>, Description}, {<<"catId">>, CategoryId}]}
-  end,
-  Map3 = fun([TagId, Description]) -> {[{<<"id">>, TagId}, {<<"dsc">>, Description}]} end,
-  Categories1 = lists:map(Map1, Categories),
-  SubCategories1 = lists:map(Map2, SubCategories),
-  Tags1 = lists:map(Map3, Tags),
-  Data = {[{<<"Categories">>, Categories1}, {<<"SubCategories">>, SubCategories1}, {<<"Tags">>, Tags1}]},
-  reply(Data, Req);
+  case {Categories, SubCategories} of
+    {system_error, _} ->
+      cowboy_req:reply(500, Req);
+    {_, system_error} ->
+      cowboy_req:reply(500, Req);
+    _ ->
+      Map1 = fun(Category) ->
+        CategoryName = proplists:get_value(name, Category),
+        {[{<<"name">>, CategoryName}]}
+      end,
+      Map2 = fun(SubCategory) ->
+        Category_Name = proplists:get_value(category_name, SubCategory),
+        Name = proplists:get_value(name, SubCategory),
+        {[{<<"cat">>, Category_Name}, {<<"subCat">>, Name}]}
+      end,
+      Categories1 = lists:map(Map1, Categories),
+      SubCategories1 = lists:map(Map2, SubCategories),
+      Data = {[{<<"Categories">>, Categories1}, {<<"SubCategories">>, SubCategories1}]},
+      reply(Data, Req)
+  end;
 
 
 process(<<"/expenses/add_transaction">>, ClientId, PostVals, Req) ->
@@ -110,10 +137,9 @@ process(<<"/expenses/add_transaction">>, ClientId, PostVals, Req) ->
     undefined ->
       missing_parameter(Req);
     Account ->
-      {AccountInt, _} = string:to_integer(binary_to_list(Account)),
-      case expenses_library:check_account_auth(ClientId, AccountInt) of
+      case expenses_library:check_account_auth(ClientId, uuid:string_to_uuid(Account)) of
         valid ->
-          add_transaction(AccountInt, PostVals, Req);
+          add_transaction(Account, PostVals, Req);
         denied ->
           cowboy_req:reply(403, Req);
         _ ->
@@ -132,15 +158,13 @@ add_transaction(Account, PostVals, Req) ->
       missing_parameter(Req);
     true ->
       Description = proplists:get_value(<<"dsc">>, PostVals),
-      {Category, _} = string:to_integer(binary_to_list(proplists:get_value(<<"cat">>, PostVals))),
-      {SubCategory, _} = string:to_integer(binary_to_list(proplists:get_value(<<"subCat">>, PostVals))),
+      Category = binary_to_list(proplists:get_value(<<"cat">>, PostVals)),
+      SubCategory = binary_to_list(proplists:get_value(<<"subCat">>, PostVals)),
       {Amount, _} = string:to_float(binary_to_list(proplists:get_value(<<"amt">>, PostVals))),
       {Timestamp, _} = string:to_integer(binary_to_list(proplists:get_value(<<"timestamp">>, PostVals))),
       Tags = proplists:get_value(<<"tags">>, PostVals),
       TagsList = string:tokens(binary_to_list(Tags), ","),
-      Map = fun(Int) -> {Number, _} = string:to_integer(Int), Number end,
-      TagIdsList = lists:map(Map, TagsList),
-      Result = expenses_library:add_transaction(Account, Description, Category, SubCategory, Amount, Timestamp, TagIdsList),
+      Result = expenses_library:add_transaction(Account, Description, Category, SubCategory, Amount, Timestamp, TagsList),
       case Result of
         ok ->
           reply([], Req);

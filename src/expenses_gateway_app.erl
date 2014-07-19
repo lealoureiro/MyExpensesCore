@@ -4,7 +4,6 @@
 -module(expenses_gateway_app).
 -behaviour(application).
 
--include("deps/mysql_client/include/client_records.hrl").
 -include("include/sessions_records.hrl").
 
 %% API.
@@ -17,11 +16,9 @@
 start(_Type, _Args) ->
   io:format("Initializing MNESIA database... ~n"),
   startDatabase(),
-  io:format("Connection MySQL database... ~n"),
-  my:new_datasource(mysql_datasource, #datasource{host = "localhost", port = 3306, database = "MFINANCES_DEV", user = "mfinances", password = "mfinances"}),
   Dispatch = cowboy_router:compile([
     {'_', [
-      {"/expenses/[...]", expenses_handler, []},
+     {"/expenses/[...]", expenses_handler, []},
       {"/auth/[...]", auth_handler, []}
     ]}
   ]),
@@ -46,7 +43,7 @@ startDatabase() ->
 
 
 custom_onresponse(StatusCode, Headers, Body, Req) ->
-  Headers2 = lists:keyreplace(<<"server">>, 1, Headers, {<<"server">>, <<"Expenses Gateway Server v0.1">>}),
+  Headers2 = lists:keyreplace(<<"server">>, 1, Headers, {<<"server">>, <<"MyExpensesCore Server v0.1">>}),
   {ok, Req2} = cowboy_req:reply(StatusCode, Headers2, Body, Req),
   Req2.
 

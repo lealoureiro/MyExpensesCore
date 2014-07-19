@@ -9,120 +9,283 @@
 -module(expenses_library).
 -author("leandroloureiro").
 
-%% API
--export([get_transactions/2, get_accounts/1, get_all_categories/0, get_all_subcategories/0, add_transaction/7, check_account_auth/2, get_all_tags/0]).
 
+-include("deps/cqerl/include/cqerl.hrl").
+
+%% API
+-export([get_transactions/2, get_accounts/1, get_all_categories/0, get_all_subcategories/0, add_transaction/7, check_account_auth/2]).
+-export([get_account_user_id/1]).
+-export([get_accounts_aux/1]).
+-export([get_account_sum/1]).
+
+%% DEV
+-export([get_transactions_aux/1]).
+
+get_account_user_id(AccountId) ->
+  try
+    AccountIdUUID = uuid:string_to_uuid(AccountId),
+    case cqerl:new_client() of
+      {ok, Client} ->
+        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT user_id FROM finances_core.user_by_account WHERE account_id = ?;">>, values = [{account_id, AccountIdUUID}]}) of
+          {ok, Result} ->
+            Row = cqerl:head(Result),
+            cqerl:close_client(Client),
+            case Row of
+              empty_dataset ->
+                not_found;
+              _ ->
+                UserId = proplists:get_value(user_id, Row),
+                {ok, UserId}
+            end;
+          _ ->
+            cqerl:close_client(Client),
+            error
+        end;
+      _ ->
+        system_error
+    end
+  catch
+    exit:badarg -> not_found
+  end.
 
 get_transactions(ClientId, AccountId) ->
-  Con = datasource:get_connection(mysql_datasource),
-  Statement1 = connection:get_prepared_statement_handle(Con, "SELECT accountName FROM Account WHERE accountId = ? AND userId = ?"),
-  {_, Accounts} = connection:execute_statement(Con, Statement1, [8, 8], [AccountId, ClientId]),
-  case Accounts of
-    [] ->
-      datasource:return_connection(mysql_datasource, Con),
-      not_found;
-    [_] ->
-      Statement2 = connection:get_prepared_statement_handle(Con, "SELECT T.transactionId,T.description,T.accountId,T.categoryId,T.subCategoryId,T.date,T.amount,T.externalReference FROM Account A,Transactions T WHERE A.accountId=T.accountId AND A.userId = ? AND T.accountId = ?"),
-      {_, Rows} = connection:execute_statement(Con, Statement2, [8, 8], [ClientId, AccountId]),
-      datasource:return_connection(mysql_datasource, Con),
-      Rows;
+  case get_account_user_id(AccountId) of
+    {ok, ClientId} ->
+      get_transactions_aux(AccountId);
+    {ok, _} ->
+      access_denied;
     _ ->
-      datasource:return_connection(mysql_datasource, Con),
       system_error
+  end.
+
+
+get_transactions_aux(AccountId) ->
+  try
+    AccountIdUUID = uuid:string_to_uuid(AccountId),
+    case cqerl:new_client() of
+      {ok, Client} ->
+        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT transaction_id,date,description,amount,category,sub_category,external_reference FROM finances_core.transactions WHERE account_id = ?;">>, values = [{account_id, AccountIdUUID}]}) of
+          {ok, Result} ->
+            cqerl:close_client(Client),
+            cqerl:all_rows(Result);
+          _ ->
+            cqerl:close_client(Client),
+            system_error
+        end;
+      _ ->
+        system_error
+    end
+  catch
+    exit:badarg -> not_found
   end.
 
 
 get_accounts(ClientId) ->
-  Con = datasource:get_connection(mysql_datasource),
-  Statement1 = connection:get_prepared_statement_handle(Con, "SELECT accountId, accountName, accountType, startBalance, currency FROM Account WHERE userId = ?"),
-  {Meta, Accounts} = connection:execute_statement(Con, Statement1, [8], [ClientId]),
+  Accounts = get_accounts_aux(ClientId),
   case Accounts of
-    [] ->
-      datasource:return_connection(mysql_datasource, Con),
-      not_found;
     [_ | _] ->
-      Statement2 = connection:get_prepared_statement_handle(Con, "SELECT accountId,SUM(amount) FROM Transactions WHERE accountId IN (SELECT accountId FROM Account WHERE userId = ?) GROUP BY accountId;"),
-      {_, ProcessedBalances} = connection:execute_statement(Con, Statement2, [8], [ClientId]),
-      Map1 = fun([Key, Value]) -> {Key, Value} end,
-      ProcessedBalances1 = lists:map(Map1, ProcessedBalances),
-      Map2 = fun([AcctId, AcctName, AcctType, StartBalance, Currency]) ->
-        Value = proplists:get_value(AcctId, ProcessedBalances1),
-        case Value of
-          undefined ->
-            {[{<<"acct">>, AcctId}, {<<"name">>, AcctName}, {<<"type">>, AcctType}, {<<"startBal">>, StartBalance}, {<<"cur">>, Currency}, {<<"bal">>, 0}]};
-          Balance ->
-            {[{<<"acct">>, AcctId}, {<<"name">>, AcctName}, {<<"type">>, AcctType}, {<<"startBal">>, StartBalance}, {<<"cur">>, Currency}, {<<"bal">>, Balance}]}
-
-        end
+      ProcessedBalances = fun(Account) ->
+        Balance = get_account_sum(proplists:get_value(account_id, Account)),
+        lists:concat([Account, [{balance, Balance}]])
       end,
-      datasource:return_connection(mysql_datasource, Con),
-      lists:map(Map2, Accounts);
+      lists:map(ProcessedBalances, Accounts);
     _ ->
-      datasource:return_connection(mysql_datasource, Con),
       system_error
   end.
+
+
+get_accounts_aux(ClientId) ->
+  case cqerl:new_client() of
+    {ok, Client} ->
+      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT account_id FROM finances_core.accounts_by_user WHERE user_id = ?">>, values = [{user_id, ClientId}]}) of
+        {ok, Result} ->
+          cqerl:close_client(Client),
+          Accounts = cqerl:all_rows(Result),
+          GetAccountsDetailMap = fun(Account) ->
+            AccountId = proplists:get_value(account_id, Account),
+            AccountInfo = get_account_datail_info(AccountId),
+            lists:concat([Account, AccountInfo])
+          end,
+          lists:map(GetAccountsDetailMap, Accounts);
+        _ ->
+          cqerl:close_client(Client),
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
+
+
+get_account_datail_info(AccountId) ->
+  case cqerl:new_client() of
+    {ok, Client} ->
+      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT account_type,currency,name,start_balance FROM finances_core.accounts WHERE account_id = ?">>, values = [{account_id, AccountId}]}) of
+        {ok, Result} ->
+          cqerl:close_client(Client),
+          cqerl:head(Result);
+        _ ->
+          cqerl:close_client(Client),
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
+
+
+get_account_sum(AccountId) ->
+  case cqerl:new_client() of
+    {ok, Client} ->
+      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT amount FROM finances_core.transactions WHERE account_id = ?">>, values = [{account_id, AccountId}], page_size = 10000}) of
+        {ok, Result} ->
+          cqerl:close_client(Client),
+          Values = cqerl:all_rows(Result),
+          sum_transactions_amount(Values);
+        _ ->
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
+
+sum_transactions_amount(Values) ->
+  sum_transactions_amount(Values, 0).
+
+sum_transactions_amount([H | T], Acc) ->
+  Amount = proplists:get_value(amount, H),
+  sum_transactions_amount(T, Amount + Acc);
+
+sum_transactions_amount([], Acc) -> Acc.
 
 
 get_all_categories() ->
-  Con = datasource:get_connection(mysql_datasource),
-  {_, Categories} = connection:execute_query(Con, "SELECT categoryId,description FROM Category"),
-  datasource:return_connection(mysql_datasource, Con),
-  Categories.
+  case cqerl:new_client() of
+    {ok, Client} ->
+      case cqerl:run_query(Client, "SELECT name FROM finances_core.category") of
+        {ok, Result} ->
+          cqerl:close_client(Client),
+          lists:sort(cqerl:all_rows(Result));
+        _ ->
+          cqerl:close_client(Client),
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
 
 
 get_all_subcategories() ->
-  Con = datasource:get_connection(mysql_datasource),
-  {_, SubCategories} = connection:execute_query(Con, "SELECT subCategoryId,description,categoryId FROM SubCategory"),
-  datasource:return_connection(mysql_datasource, Con),
-  SubCategories.
-
-
-add_transaction(AccountId, Description, CategoryId, SubCategoryId, Amount, Timestamp, Tags) ->
-  Con = datasource:get_connection(mysql_datasource),
-  Statement = connection:get_prepared_statement_handle(Con, "INSERT INTO Transactions (description,accountId,categoryId,subCategoryId,date,amount) VALUES(?,?,?,?,?,?);"),
-  Result = connection:execute_statement(Con, Statement, [253, 8, 8, 8, 8, 5], [Description, AccountId, CategoryId, SubCategoryId, Timestamp, Amount]),
-  case Result of
-    {_, [{ok_packet, _, NewId, _, _, _}]} ->
-      Statement2 = connection:get_prepared_statement_handle(Con, "INSERT INTO TransactionTag (transactionId,tagId) VALUES(?,?)"),
-      Result2 = assign_tag_to_transaction(Tags, NewId, Statement2, Con),
-      datasource:return_connection(mysql_datasource, Con),
-      Result2;
-    _ ->
-      datasource:return_connection(mysql_datasource, Con),
-      system_error
-  end.
-
-assign_tag_to_transaction([H | T], NewId, Statement, Con) ->
-  case connection:execute_statement(Con, Statement, [8, 8], [NewId, H]) of
-    {_, [{ok_packet, _, _, _, _, _}]} ->
-      assign_tag_to_transaction(T, NewId, Statement, Con);
-    _ ->
-      system_error
-  end;
-
-assign_tag_to_transaction([], _, _, _) ->
-  ok.
-
-
-check_account_auth(Client, Account) ->
-  Con = datasource:get_connection(mysql_datasource),
-  Statement1 = connection:get_prepared_statement_handle(Con, "SELECT accountName FROM Account WHERE accountId = ? AND userId = ?"),
-  {_, Accounts} = connection:execute_statement(Con, Statement1, [8, 8], [Account, Client]),
-  datasource:return_connection(mysql_datasource, Con),
-  case Accounts of
-    [] ->
-      denied;
-    [_] ->
-      valid;
+  case cqerl:new_client() of
+    {ok, Client} ->
+      case cqerl:run_query(Client, "SELECT category_name,name FROM finances_core.sub_category") of
+        {ok, Result} ->
+          cqerl:close_client(Client),
+          lists:sort(cqerl:all_rows(Result));
+        _ ->
+          cqerl:close_client(Client),
+          system_error
+      end;
     _ ->
       system_error
   end.
 
-get_all_tags() ->
-  Con = datasource:get_connection(mysql_datasource),
-  {_, Tags} = connection:execute_query(Con, "SELECT tagId,description FROM Tag"),
-  datasource:return_connection(mysql_datasource, Con),
-  Tags.
+
+add_transaction(AccountId, Description, Category, SubCategory, Amount, Timestamp, Tags) ->
+  AccountIdUUID = uuid:string_to_uuid(AccountId),
+  TransactionId = uuid:get_v4_urandom(),
+  case cqerl:new_client() of
+    {ok, Client} ->
+      Result = cqerl:run_query(Client, #cql_query{
+        statement = <<"INSERT INTO finances_core.transactions
+          (transaction_id,date,account_id,amount,description,category,sub_category)
+          VALUES (?, ?, ?, ?, ?, ?, ?)">>,
+        values = [
+          {transaction_id, TransactionId},
+          {account_id, AccountIdUUID},
+          {description, Description},
+          {amount, Amount},
+          {date, Timestamp},
+          {category, Category},
+          {sub_category, SubCategory}
+        ]
+      }),
+      cqerl:close_client(Client),
+      case Result of
+        {ok, void} ->
+          AddTagsMap = fun(Tag) ->
+            add_tag_to_transaction(TransactionId, Tag)
+          end,
+          Results = lists:map(AddTagsMap, Tags),
+          ResultOk = fun(SingleResult) -> SingleResult == ok end,
+          case lists:all(ResultOk, Results) of
+            true ->
+              ok;
+            _ ->
+              system_error
+          end;
+        _ ->
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
+
+add_tag_to_transaction(TransactionId, Tag) when is_integer(Tag) ->
+  add_tag_to_transaction(TransactionId, integer_to_list(Tag));
+
+add_tag_to_transaction(TransactionId, Tag) when is_list(Tag) ->
+  case cqerl:new_client() of
+    {ok, Client} ->
+      Result = cqerl:run_query(Client,
+        #cql_query{statement = <<"INSERT INTO finances_core.tags_by_transaction (transaction_id,tag) VALUES (?,?)">>,
+          values = [{transaction_id, TransactionId}, {tag, Tag}]}
+      ),
+      case Result of
+        {ok, void} ->
+          Result2 = cqerl:run_query(Client,
+            #cql_query{statement = <<"INSERT INTO finances_core.transactions_by_tag (transaction_id,tag) VALUES (?,?)">>,
+              values = [{transaction_id, TransactionId}, {tag, Tag}]}
+          ),
+          cqerl:close_client(Client),
+          case Result2 of
+            {ok, void} ->
+              ok;
+            _ ->
+              system_error
+          end;
+        _ ->
+          cqerl:close_client(Client),
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
+
+
+check_account_auth(ClientId, AccountId) ->
+  case cqerl:new_client() of
+    {ok, Client} ->
+      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT user_id FROM finances_core.user_by_account WHERE account_id = ?">>, values = [{account_id, AccountId}]}) of
+        {ok, Result} ->
+          cqerl:close_client(Client),
+          Row = cqerl:head(Result),
+          case Row of
+            empty_dataset ->
+              not_found;
+            _ ->
+              case proplists:get_value(user_id, Row) of
+                ClientId ->
+                  valid;
+                _ ->
+                  denied
+              end
+          end;
+        _ ->
+          cqerl:close_client(Client),
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
 
 
 
