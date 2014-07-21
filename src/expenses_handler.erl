@@ -120,9 +120,9 @@ process(<<"/expenses/get_categories">>, _, _, Req) ->
         {[{<<"name">>, CategoryName}]}
       end,
       Map2 = fun(SubCategory) ->
-        Category_Name = proplists:get_value(category_name, SubCategory),
+        CategoryName = proplists:get_value(category_name, SubCategory),
         Name = proplists:get_value(name, SubCategory),
-        {[{<<"cat">>, Category_Name}, {<<"subCat">>, Name}]}
+        {[{<<"cat">>, CategoryName}, {<<"subCat">>, Name}]}
       end,
       Categories1 = lists:map(Map1, Categories),
       SubCategories1 = lists:map(Map2, SubCategories),
@@ -152,7 +152,12 @@ process(_, _, _, Req) ->
 
 
 add_transaction(Account, PostVals, Req) ->
-  Valid = proplists:is_defined(<<"dsc">>, PostVals) and proplists:is_defined(<<"cat">>, PostVals) and proplists:is_defined(<<"subCat">>, PostVals) and proplists:is_defined(<<"amt">>, PostVals) and proplists:is_defined(<<"timestamp">>, PostVals) and proplists:is_defined(<<"tags">>, PostVals),
+  Valid = proplists:is_defined(<<"dsc">>, PostVals)
+    and proplists:is_defined(<<"cat">>, PostVals)
+    and proplists:is_defined(<<"subCat">>, PostVals)
+    and proplists:is_defined(<<"amt">>, PostVals)
+    and proplists:is_defined(<<"timestamp">>, PostVals)
+    and proplists:is_defined(<<"tags">>, PostVals),
   case Valid of
     false ->
       missing_parameter(Req);
