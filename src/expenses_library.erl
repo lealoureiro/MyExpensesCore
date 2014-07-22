@@ -220,7 +220,7 @@ add_transaction(AccountId, Description, Category, SubCategory, Amount, Timestamp
           ResultOk = fun(SingleResult) -> SingleResult == ok end,
           case lists:all(ResultOk, Results) of
             true ->
-              ok;
+              {ok, uuid:uuid_to_string(TransactionId, binary_standard)};
             _ ->
               system_error
           end;

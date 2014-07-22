@@ -175,8 +175,8 @@ add_transaction(Account, PostVals, Req) ->
       TagsList = string:tokens(binary_to_list(Tags), ","),
       Result = expenses_library:add_transaction(Account, Description, Category, SubCategory, Amount, Timestamp, TagsList),
       case Result of
-        ok ->
-          reply([], Req);
+        {ok,TransactionId} ->
+          reply({[{<<"transactionId">>, TransactionId}]}, Req);
         system_error ->
           cowboy_req:reply(400, Req)
       end
