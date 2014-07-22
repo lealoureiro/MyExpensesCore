@@ -101,6 +101,8 @@ process(<<"/expenses/get_accounts">>, ClientId, _, Req) ->
       end,
       Data = lists:map(Map, Accounts),
       reply(Data, Req);
+    [] ->
+      reply([], Req);
     _ ->
       cowboy_req:reply(500, Req)
   end;
@@ -137,10 +139,12 @@ process(<<"/expenses/add_transaction">>, ClientId, PostVals, Req) ->
     undefined ->
       missing_parameter(Req);
     Account ->
-      case expenses_library:check_account_auth(ClientId, uuid:string_to_uuid(Account)) of
+      case expenses_library:check_account_auth(ClientId, Account) of
         valid ->
           add_transaction(Account, PostVals, Req);
         denied ->
+          cowboy_req:reply(403, Req);
+        not_found ->
           cowboy_req:reply(403, Req);
         _ ->
           cowboy_req:reply(500, Req)

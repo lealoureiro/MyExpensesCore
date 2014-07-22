@@ -1,5 +1,7 @@
-use finances_core;
 
+CREATE KEYSPACE finances_core WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };
+
+use finances_core;
 
 CREATE TABLE users (
     user_id uuid PRIMARY KEY,
@@ -10,7 +12,7 @@ CREATE TABLE users (
 
 CREATE TABLE users_by_username (
     username varchar PRIMARY KEY,
-    user_id uuid;
+    user_id uuid
 );
 
 CREATE TABLE accounts (
@@ -41,13 +43,16 @@ CREATE TABLE transactions (
     date timestamp,
     amount double,
     external_reference text,
-    PRIMARY KEY (account_id, date, transaction_id,amount)
+    PRIMARY KEY (account_id, date, transaction_id, amount)
 )
 WITH CLUSTERING ORDER BY (date DESC);
 
 CREATE INDEX search_by_category ON transactions (category);
 CREATE INDEX search_by_sub_category ON transactions (sub_category);
 
+CREATE TABLE category (
+    name text PRIMARY KEY 
+);
 
 CREATE TABLE sub_category (
     category_name text,

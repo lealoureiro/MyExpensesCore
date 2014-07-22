@@ -89,6 +89,8 @@ get_accounts(ClientId) ->
         lists:concat([Account, [{balance, Balance}]])
       end,
       lists:map(ProcessedBalances, Accounts);
+    [] ->
+      [];
     _ ->
       system_error
   end.
@@ -262,31 +264,35 @@ add_tag_to_transaction(TransactionId, Tag) when is_list(Tag) ->
 
 
 check_account_auth(ClientId, AccountId) ->
-  case cqerl:new_client() of
-    {ok, Client} ->
-      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT user_id FROM finances_core.user_by_account WHERE account_id = ?">>, values = [{account_id, AccountId}]}) of
-        {ok, Result} ->
-          cqerl:close_client(Client),
-          Row = cqerl:head(Result),
-          case Row of
-            empty_dataset ->
-              not_found;
-            _ ->
-              case proplists:get_value(user_id, Row) of
-                ClientId ->
-                  valid;
-                _ ->
-                  denied
-              end
-          end;
-        _ ->
-          cqerl:close_client(Client),
-          system_error
-      end;
-    _ ->
-      system_error
+  try
+    AccountIdUUID = uuid:string_to_uuid(AccountId),
+    case cqerl:new_client() of
+      {ok, Client} ->
+        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT user_id FROM finances_core.user_by_account WHERE account_id = ?">>, values = [{account_id, AccountIdUUID}]}) of
+          {ok, Result} ->
+            cqerl:close_client(Client),
+            Row = cqerl:head(Result),
+            case Row of
+              empty_dataset ->
+                not_found;
+              _ ->
+                case proplists:get_value(user_id, Row) of
+                  ClientId ->
+                    valid;
+                  _ ->
+                    denied
+                end
+            end;
+          _ ->
+            cqerl:close_client(Client),
+            system_error
+        end;
+      _ ->
+        system_error
+    end
+  catch
+    exit:badarg -> not_found
   end.
-
 
 
 
