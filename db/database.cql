@@ -30,7 +30,7 @@ CREATE TABLE user_by_account (
 );
 
 CREATE TABLE accounts_by_user (
-    user_id uuid PRIMARY KEY,
+    user_id uuid,
     account_id uuid,
     PRIMARY KEY (user_id, account_id)
 );
