@@ -25,8 +25,9 @@ CREATE TABLE accounts (
 );
 
 CREATE TABLE user_by_account (
-    account_id uuid PRIMARY KEY,
-    user_id uuid
+    account_id uuid,
+    user_id uuid,
+    PRIMARY KEY (account_id, user_id)
 );
 
 CREATE TABLE accounts_by_user (
