@@ -17,6 +17,7 @@
 -export([get_account_user_id/1]).
 -export([get_accounts_aux/1]).
 -export([get_account_sum/1]).
+-export([add_account/5]).
 
 %% DEV
 -export([get_transactions_aux/1]).
@@ -26,7 +27,7 @@ get_account_user_id(AccountId) ->
     AccountIdUUID = uuid:string_to_uuid(AccountId),
     case cqerl:new_client() of
       {ok, Client} ->
-        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT user_id FROM finances_core.user_by_account WHERE account_id = ?;">>, values = [{account_id, AccountIdUUID}]}) of
+        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT user_id FROM user_by_account WHERE account_id = ?;">>, values = [{account_id, AccountIdUUID}]}) of
           {ok, Result} ->
             Row = cqerl:head(Result),
             cqerl:close_client(Client),
@@ -64,7 +65,7 @@ get_transactions_aux(AccountId) ->
     AccountIdUUID = uuid:string_to_uuid(AccountId),
     case cqerl:new_client() of
       {ok, Client} ->
-        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT transaction_id,date,description,amount,category,sub_category,external_reference FROM finances_core.transactions WHERE account_id = ?;">>, values = [{account_id, AccountIdUUID}]}) of
+        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT transaction_id,date,description,amount,category,sub_category,external_reference FROM transactions WHERE account_id = ?;">>, values = [{account_id, AccountIdUUID}]}) of
           {ok, Result} ->
             cqerl:close_client(Client),
             cqerl:all_rows(Result);
@@ -99,7 +100,7 @@ get_accounts(ClientId) ->
 get_accounts_aux(ClientId) ->
   case cqerl:new_client() of
     {ok, Client} ->
-      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT account_id FROM finances_core.accounts_by_user WHERE user_id = ?">>, values = [{user_id, ClientId}]}) of
+      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT account_id FROM accounts_by_user WHERE user_id = ?">>, values = [{user_id, ClientId}]}) of
         {ok, Result} ->
           cqerl:close_client(Client),
           Accounts = cqerl:all_rows(Result),
@@ -121,7 +122,7 @@ get_accounts_aux(ClientId) ->
 get_account_datail_info(AccountId) ->
   case cqerl:new_client() of
     {ok, Client} ->
-      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT account_type,currency,name,start_balance FROM finances_core.accounts WHERE account_id = ?">>, values = [{account_id, AccountId}]}) of
+      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT account_type,currency,name,start_balance FROM accounts WHERE account_id = ?">>, values = [{account_id, AccountId}]}) of
         {ok, Result} ->
           cqerl:close_client(Client),
           cqerl:head(Result);
@@ -137,7 +138,7 @@ get_account_datail_info(AccountId) ->
 get_account_sum(AccountId) ->
   case cqerl:new_client() of
     {ok, Client} ->
-      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT amount FROM finances_core.transactions WHERE account_id = ?">>, values = [{account_id, AccountId}], page_size = 10000}) of
+      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT amount FROM transactions WHERE account_id = ?">>, values = [{account_id, AccountId}], page_size = 10000}) of
         {ok, Result} ->
           cqerl:close_client(Client),
           Values = cqerl:all_rows(Result),
@@ -162,7 +163,7 @@ sum_transactions_amount([], Acc) -> Acc.
 get_all_categories() ->
   case cqerl:new_client() of
     {ok, Client} ->
-      case cqerl:run_query(Client, "SELECT name FROM finances_core.category") of
+      case cqerl:run_query(Client, "SELECT name FROM category") of
         {ok, Result} ->
           cqerl:close_client(Client),
           lists:sort(cqerl:all_rows(Result));
@@ -178,7 +179,7 @@ get_all_categories() ->
 get_all_subcategories() ->
   case cqerl:new_client() of
     {ok, Client} ->
-      case cqerl:run_query(Client, "SELECT category_name,name FROM finances_core.sub_category") of
+      case cqerl:run_query(Client, "SELECT category_name,name FROM sub_category") of
         {ok, Result} ->
           cqerl:close_client(Client),
           lists:sort(cqerl:all_rows(Result));
@@ -197,7 +198,7 @@ add_transaction(AccountId, Description, Category, SubCategory, Amount, Timestamp
   case cqerl:new_client() of
     {ok, Client} ->
       Result = cqerl:run_query(Client, #cql_query{
-        statement = <<"INSERT INTO finances_core.transactions
+        statement = <<"INSERT INTO transactions
           (transaction_id,date,account_id,amount,description,category,sub_category)
           VALUES (?, ?, ?, ?, ?, ?, ?)">>,
         values = [
@@ -238,13 +239,13 @@ add_tag_to_transaction(TransactionId, Tag) when is_list(Tag) ->
   case cqerl:new_client() of
     {ok, Client} ->
       Result = cqerl:run_query(Client,
-        #cql_query{statement = <<"INSERT INTO finances_core.tags_by_transaction (transaction_id,tag) VALUES (?,?)">>,
+        #cql_query{statement = <<"INSERT INTO tags_by_transaction (transaction_id,tag) VALUES (?,?)">>,
           values = [{transaction_id, TransactionId}, {tag, Tag}]}
       ),
       case Result of
         {ok, void} ->
           Result2 = cqerl:run_query(Client,
-            #cql_query{statement = <<"INSERT INTO finances_core.transactions_by_tag (transaction_id,tag) VALUES (?,?)">>,
+            #cql_query{statement = <<"INSERT INTO transactions_by_tag (transaction_id,tag) VALUES (?,?)">>,
               values = [{transaction_id, TransactionId}, {tag, Tag}]}
           ),
           cqerl:close_client(Client),
@@ -262,13 +263,87 @@ add_tag_to_transaction(TransactionId, Tag) when is_list(Tag) ->
       system_error
   end.
 
+add_account(Name, Type, StartBalance, Currency, UserID) ->
+  AccountID = uuid:get_v4_urandom(),
+  UserIDUUID = uuid:string_to_uuid(UserID),
+  case cqerl:new_client() of
+    {ok, Client} ->
+      Result = cqerl:run_query(Client, #cql_query{
+        statement = <<"INSERT INTO accounts
+          (account_id,name,account_type,start_balance,currency,user_id) VALUES (?,?,?,?,?,?)">>,
+        values = [
+          {account_id, AccountID},
+          {name, Name},
+          {account_type, Type},
+          {start_balance, StartBalance},
+          {currency, Currency},
+          {user_id, UserIDUUID}
+        ]}),
+      cqerl:close_client(Client),
+      case Result of
+        {ok, void} ->
+          case insert_user_by_account(UserIDUUID, AccountID) of
+            ok ->
+              case insert_account_by_user(AccountID, UserIDUUID) of
+                ok ->
+                  {ok, uuid:uuid_to_string(AccountID, binary_standard)};
+                _ ->
+                  system_error
+              end;
+            _ ->
+              system_error
+          end;
+        _ ->
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
+
+insert_user_by_account(UserId, AccountId) ->
+  case cqerl:new_client() of
+    {ok, Client} ->
+      Result = cqerl:run_query(Client, #cql_query{
+        statement = <<"INSERT INTO user_by_account (account_id,user_id) VALUES (?,?)">>,
+        values = [
+          {account_id, AccountId},
+          {user_id, UserId}
+        ]}),
+      case Result of
+        {ok, void} ->
+          ok;
+        _ ->
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
+
+insert_account_by_user(AccountId, UserId) ->
+  case cqerl:new_client() of
+    {ok, Client} ->
+      Result = cqerl:run_query(Client, #cql_query{
+        statement = <<"INSERT INTO accounts_by_user (user_id,account_id) VALUES (?,?)">>,
+        values = [
+          {user_id, UserId},
+          {account_id, AccountId}
+        ]}),
+      case Result of
+        {ok, void} ->
+          ok;
+        _ ->
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
 
 check_account_auth(ClientId, AccountId) ->
   try
     AccountIdUUID = uuid:string_to_uuid(AccountId),
     case cqerl:new_client() of
       {ok, Client} ->
-        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT user_id FROM finances_core.user_by_account WHERE account_id = ?">>, values = [{account_id, AccountIdUUID}]}) of
+        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT user_id FROM user_by_account WHERE account_id = ?">>, values = [{account_id, AccountIdUUID}]}) of
           {ok, Result} ->
             cqerl:close_client(Client),
             Row = cqerl:head(Result),

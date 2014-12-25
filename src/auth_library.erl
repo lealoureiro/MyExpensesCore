@@ -43,7 +43,7 @@ login(Username, Password) ->
 get_user_id(Username) ->
   case cqerl:new_client() of
     {ok, Client} ->
-      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT user_id FROM finances_core.users_by_username WHERE username = ?;">>, values = [{username, Username}]}) of
+      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT user_id FROM users_by_username WHERE username = ?;">>, values = [{username, Username}]}) of
         {ok, Result} ->
           Row = cqerl:head(Result),
           cqerl:close_client(Client),
@@ -67,7 +67,7 @@ get_user_data(UserId) ->
     true ->
       case cqerl:new_client() of
         {ok, Client} ->
-          case cqerl:run_query(Client, #cql_query{statement = <<"SELECT username,password,name FROM finances_core.users WHERE user_id = ?;">>, values = [{user_id, UserId}]}) of
+          case cqerl:run_query(Client, #cql_query{statement = <<"SELECT username,password,name FROM users WHERE user_id = ?;">>, values = [{user_id, UserId}]}) of
             {ok, Result} ->
               Row = cqerl:head(Result),
               case Row of
