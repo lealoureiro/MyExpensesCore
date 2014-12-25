@@ -30,7 +30,7 @@ handle(Req, State) ->
 maybe_reply(<<"POST">>, _, Req) ->
   {ok, PostVals, Req2} = cowboy_req:body_qs(Req),
   {Path, Req3} = cowboy_req:path(Req2),
-  io:format("Requested: ~s ~n", [Path]),
+  lager:log(info, self(), "Requested: ~s ~n", [Path]),
   process(Path, PostVals, Req3);
 
 maybe_reply(_, _, Req) ->

@@ -4,6 +4,7 @@
   {modules, []},
   {registered, [expenses_gateway_sup]},
   {applications, [
+    lager,
     kernel,
     stdlib,
     cowboy,

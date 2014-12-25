@@ -14,7 +14,7 @@
 
 
 start(_Type, _Args) ->
-  io:format("Initializing MNESIA database... ~n"),
+  lager:log(info, self(), "Initializing MNESIA database... ~n"),
   startDatabase(),
   Dispatch = cowboy_router:compile([
     {'_', [
@@ -22,7 +22,7 @@ start(_Type, _Args) ->
       {"/auth/[...]", auth_handler, []}
     ]}
   ]),
-  io:format("Starting HTTP Server... ~n"),
+  lager:log(info, self(), "Starting HTTP Server... ~n"),
   {ok, _} = cowboy:start_http(http, 100, [
     {port, 8081}
   ],
@@ -30,7 +30,7 @@ start(_Type, _Args) ->
       {env, [{dispatch, Dispatch}]},
       {onresponse, fun custom_onresponse/4}
     ]),
-  io:format("Starting CORE Application... ~n"),
+  lager:log(info, self(), "Starting CORE Application... ~n"),
   expenses_gateway_sup:start_link().
 
 stop(_State) ->
@@ -43,7 +43,7 @@ startDatabase() ->
 
 
 custom_onresponse(StatusCode, Headers, Body, Req) ->
-  Headers2 = lists:keyreplace(<<"server">>, 1, Headers, {<<"server">>, <<"MyExpensesCore Server v0.1">>}),
+  Headers2 = lists:keyreplace(<<"server">>, 1, Headers, {<<"server">>, <<"MyExpensesCore Server v0.1.0">>}),
   {ok, Req2} = cowboy_req:reply(StatusCode, Headers2, Body, Req),
   Req2.
 

@@ -22,7 +22,7 @@ maybe_reply(<<"POST">>, _, Req) ->
   {ok, PostVals, Req2} = cowboy_req:body_qs(Req),
   {Path, Req3} = cowboy_req:path(Req2),
   AccessToken = proplists:get_value(<<"token">>, PostVals),
-  io:format("Requested: ~s Token: ~s ~n", [Path, AccessToken]),
+  lager:log(info, self(), "Requested: ~s Token: ~s ~n", [Path, AccessToken]),
   case auth_library:auth(AccessToken) of
     {ok, ClientId} ->
       process(Path, ClientId, PostVals, Req3);
@@ -48,7 +48,7 @@ process(<<"/expenses/echo">>, _, PostVals, Req) ->
 
 process(<<"/expenses/get_transactions">>, ClientId, PostVals, Req) ->
   Acct = proplists:get_value(<<"acct">>, PostVals),
-  io:format("Processing transactions, Client ~s Acccount: ~s ~n", [uuid:uuid_to_string(ClientId), Acct]),
+  lager:log(info, self(), "Processing transactions, Client ~s Acccount: ~s ~n", [uuid:uuid_to_string(ClientId), Acct]),
   case Acct of
     undefined ->
       missing_parameter(Req);

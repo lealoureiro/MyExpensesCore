@@ -171,7 +171,7 @@ show_sessions() ->
 show_session_record([H | Tail]) ->
   #sessions{token = T, client_id = C, started = S, ended = E, last_heart_beat = L, valid = V} = H,
   Uiid = uuid:uuid_to_string(C),
-  io:format("User: ~s~nToken: ~s~nStarted: ~B    Last Activity: ~B     Ended: ~B     Valid: ~B~n~n", [Uiid, T, S, L, E, V]),
+  lager:log(info, self(),"User: ~s~nToken: ~s~nStarted: ~B    Last Activity: ~B     Ended: ~B     Valid: ~B~n~n", [Uiid, T, S, L, E, V]),
   show_session_record(Tail);
 
 show_session_record([]) ->
