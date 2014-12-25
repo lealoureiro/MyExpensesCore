@@ -194,7 +194,7 @@ get_all_subcategories() ->
 
 add_transaction(AccountId, Description, Category, SubCategory, Amount, Timestamp, Tags) ->
   AccountIdUUID = uuid:string_to_uuid(AccountId),
-  TransactionId = uuid:get_v4_urandom(),
+  TransactionId = uuid:get_v4(strong),
   case cqerl:new_client() of
     {ok, Client} ->
       Result = cqerl:run_query(Client, #cql_query{
@@ -264,7 +264,7 @@ add_tag_to_transaction(TransactionId, Tag) when is_list(Tag) ->
   end.
 
 add_account(Name, Type, StartBalance, Currency, UserID) ->
-  AccountID = uuid:get_v4_urandom(),
+  AccountID = uuid:get_v4(strong),
   UserIDUUID = uuid:string_to_uuid(UserID),
   case cqerl:new_client() of
     {ok, Client} ->
