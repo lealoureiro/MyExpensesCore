@@ -34,7 +34,7 @@ maybe_reply(<<"POST">>, _, Req) ->
   process(Path, PostVals, Req3);
 
 maybe_reply(_, _, Req) ->
-  cowboy_req:reply(405, Req).
+  cowboy_req:reply(405, [{<<"connection">>, <<"close">>}], Req).
 
 
 process(<<"/auth/login">>, PostVals, Req) ->
@@ -56,12 +56,12 @@ login(_, undefined, Req) ->
 login(Username, Password, Req) ->
   case auth_library:login(Username, Password) of
     not_found ->
-      cowboy_req:reply(403, Req);
+      cowboy_req:reply(403, [{<<"connection">>, <<"close">>}], Req);
     {Token, Id, Name} ->
       Data = {[{<<"token">>, Token}, {<<"id">>, Id}, {<<"name">>, Name}]},
       reply(Data, Req);
     _ ->
-      cowboy_req:reply(500, Req)
+      cowboy_req:reply(500, [{<<"connection">>, <<"close">>}], Req)
   end.
 
 
@@ -73,7 +73,7 @@ logout(Token, Req) ->
     ok ->
       cowboy_req:reply(200, Req);
     not_valid ->
-      cowboy_req:reply(403, Req)
+      cowboy_req:reply(403, [{<<"connection">>, <<"close">>}], Req)
   end.
 
 
@@ -83,7 +83,7 @@ reply(Data, Req) ->
 
 
 missing_parameter(Req) ->
-  cowboy_req:reply(400, [], <<"Missing a parameter!">>, Req).
+  cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], <<"Missing a parameter!">>, Req).
 
 
 terminate(_Reason, _Req, _State) ->

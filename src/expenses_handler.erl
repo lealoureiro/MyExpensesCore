@@ -27,7 +27,7 @@ maybe_reply(<<"POST">>, _, Req) ->
     {ok, ClientId} ->
       process(Path, ClientId, PostVals, Req3);
     {not_valid} ->
-      cowboy_req:reply(403, Req);
+      access_denied(Req);
     _ ->
       cowboy_req:reply(500, Req)
   end;
@@ -56,9 +56,9 @@ process(<<"/expenses/get_transactions">>, ClientId, PostVals, Req) ->
       Transactions = expenses_library:get_transactions(ClientId, Acct),
       case Transactions of
         not_found ->
-          cowboy_req:reply(403, Req);
+          access_denied(Req);
         access_denied ->
-          cowboy_req:reply(403, Req);
+          access_denied(Req);
         [_ | _] ->
           Mapping = fun(Transaction) ->
             Id = list_to_binary(uuid:uuid_to_string(proplists:get_value(transaction_id, Transaction))),
@@ -143,9 +143,9 @@ process(<<"/expenses/add_transaction">>, ClientId, PostVals, Req) ->
         valid ->
           add_transaction(Account, PostVals, Req);
         denied ->
-          cowboy_req:reply(403, Req);
+          access_denied(Req);
         not_found ->
-          cowboy_req:reply(403, Req);
+          access_denied(Req);
         _ ->
           cowboy_req:reply(500, Req)
       end
@@ -189,8 +189,11 @@ reply(Data, Req) ->
     {<<"content-type">>, <<"application/json; charset=utf-8">>}
   ], EchoJSON, Req).
 
+access_denied(Req) ->
+  cowboy_req:reply(403, [{<<"connection">>, <<"close">>}], Req).
+
 missing_parameter(Req) ->
-  cowboy_req:reply(400, [], <<"Missing a parameter!">>, Req).
+  cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], <<"Missing a parameter!">>, Req).
 
 terminate(_Reason, _Req, _State) ->
   ok.
