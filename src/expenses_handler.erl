@@ -29,11 +29,11 @@ maybe_reply(<<"POST">>, _, Req) ->
     {not_valid} ->
       access_denied(Req);
     _ ->
-      cowboy_req:reply(500, Req)
+      server_error(Req)
   end;
 
 maybe_reply(_, _, Req) ->
-  cowboy_req:reply(405, Req).
+  method_not_allowed(Req).
 
 
 process(<<"/expenses/echo">>, _, PostVals, Req) ->
@@ -80,7 +80,7 @@ process(<<"/expenses/get_transactions">>, ClientId, PostVals, Req) ->
         [] ->
           reply([], Req);
         _ ->
-          cowboy_req:reply(500, Req)
+          server_error(Req)
       end
   end;
 
@@ -104,7 +104,7 @@ process(<<"/expenses/get_accounts">>, ClientId, _, Req) ->
     [] ->
       reply([], Req);
     _ ->
-      cowboy_req:reply(500, Req)
+      server_error(Req)
   end;
 
 
@@ -113,9 +113,9 @@ process(<<"/expenses/get_categories">>, _, _, Req) ->
   SubCategories = expenses_library:get_all_subcategories(),
   case {Categories, SubCategories} of
     {system_error, _} ->
-      cowboy_req:reply(500, Req);
+      server_error(Req);
     {_, system_error} ->
-      cowboy_req:reply(500, Req);
+      server_error(Req);
     _ ->
       Map1 = fun(Category) ->
         CategoryName = proplists:get_value(name, Category),
@@ -147,12 +147,12 @@ process(<<"/expenses/add_transaction">>, ClientId, PostVals, Req) ->
         not_found ->
           access_denied(Req);
         _ ->
-          cowboy_req:reply(500, Req)
+          server_error(Req)
       end
   end;
 
 process(_, _, _, Req) ->
-  cowboy_req:reply(405, Req).
+  method_not_allowed(Req).
 
 
 add_transaction(Account, PostVals, Req) ->
@@ -175,10 +175,10 @@ add_transaction(Account, PostVals, Req) ->
       TagsList = string:tokens(binary_to_list(Tags), ","),
       Result = expenses_library:add_transaction(Account, Description, Category, SubCategory, Amount, Timestamp, TagsList),
       case Result of
-        {ok,TransactionId} ->
+        {ok, TransactionId} ->
           reply({[{<<"transactionId">>, TransactionId}]}, Req);
         system_error ->
-          cowboy_req:reply(400, Req)
+          missing_parameter(Req)
       end
   end.
 
@@ -194,6 +194,12 @@ access_denied(Req) ->
 
 missing_parameter(Req) ->
   cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], <<"Missing a parameter!">>, Req).
+
+server_error(Req) ->
+  cowboy_req:reply(500, [{<<"connection">>, <<"close">>}], Req).
+
+method_not_allowed(Req) ->
+  cowboy_req:reply(405, [{<<"connection">>, <<"close">>}], Req).
 
 terminate(_Reason, _Req, _State) ->
   ok.
