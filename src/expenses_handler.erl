@@ -151,6 +151,28 @@ process(<<"/expenses/add_transaction">>, ClientId, PostVals, Req) ->
       end
   end;
 
+process(<<"/expenses/add_account">>, ClientId, PostVals, Req) ->
+  Valid = proplists:is_defined(<<"name">>, PostVals)
+    and proplists:is_defined(<<"type">>, PostVals)
+    and proplists:is_defined(<<"startBalance">>, PostVals)
+    and proplists:is_defined(<<"currency">>, PostVals),
+  case Valid of
+    false ->
+      missing_parameter(Req);
+    true ->
+      Name = proplists:get_value(<<"name">>, PostVals),
+      Type = proplists:get_value(<<"type">>, PostVals),
+      {StartBalance, _} = string:to_float(binary_to_list(proplists:get_value(<<"startBalance">>, PostVals))),
+      Currency = proplists:get_value(<<"currency">>, PostVals),
+      Result = expenses_library:add_account(Name, Type, StartBalance, Currency, ClientId),
+      case Result of
+        {ok, AccountId} ->
+          reply({[{<<"accountId">>, AccountId}]}, Req);
+        system_error ->
+          missing_parameter(Req)
+      end
+  end;
+
 process(_, _, _, Req) ->
   method_not_allowed(Req).
 
