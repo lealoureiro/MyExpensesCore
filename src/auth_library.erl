@@ -13,7 +13,7 @@
 -include("deps/cqerl/include/cqerl.hrl").
 
 %% API
--export([login/2, auth/1, logout/1, get_user_id/1, get_user_data/1, show_sessions/0]).
+-export([login/2, auth/1, logout/1, get_user_id/1, get_user_data/1, show_sessions/0, generate_token/2]).
 
 login(Username, Password) when is_list(Username) ->
   login(list_to_binary(Username), Password);
@@ -93,8 +93,7 @@ get_user_data(UserId) ->
 
 
 createSession(ClientId) ->
-  TokenBytes = crypto:strong_rand_bytes(64),
-  Token = base64:encode(TokenBytes),
+  Token = generate_token("", 0),
   Timestamp = unixTimeStamp(),
   End = Timestamp + 300,
   Fun = fun() ->
@@ -107,6 +106,17 @@ createSession(ClientId) ->
     _ ->
       error
   end.
+
+generate_token(Token, 128) ->
+  Token;
+
+generate_token(TokenPart, _) ->
+  TokenBytes = crypto:strong_rand_bytes(64),
+  TokenString = base64:encode(TokenBytes),
+  TokenFiltered = re:replace(TokenString, "[^A-Za-z0-1]", "", [global, {return, list}]),
+  NewToken = string:substr(string:concat(TokenPart, TokenFiltered), 1, 128),
+  generate_token(NewToken, string:len(NewToken)).
+
 
 auth(Token) ->
   CheckTokenFun = fun() ->
@@ -171,7 +181,7 @@ show_sessions() ->
 show_session_record([H | Tail]) ->
   #sessions{token = T, client_id = C, started = S, ended = E, last_heart_beat = L, valid = V} = H,
   Uiid = uuid:uuid_to_string(C),
-  lager:log(info, self(),"User: ~s~nToken: ~s~nStarted: ~B    Last Activity: ~B     Ended: ~B     Valid: ~B~n~n", [Uiid, T, S, L, E, V]),
+  lager:log(info, self(), "User: ~s~nToken: ~s~nStarted: ~B    Last Activity: ~B     Ended: ~B     Valid: ~B~n~n", [Uiid, T, S, L, E, V]),
   show_session_record(Tail);
 
 show_session_record([]) ->
