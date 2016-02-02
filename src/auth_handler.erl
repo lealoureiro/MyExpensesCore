@@ -43,7 +43,7 @@ process(<<"/auth/login">>, PostVals, Req) ->
   login(Username, Password, Req);
 
 process(<<"/auth/logout">>, PostVals, Req) ->
-  Token = proplists:get_value(<<"token">>, PostVals),
+  Token = binary_to_list(proplists:get_value(<<"token">>, PostVals)),
   logout(Token, Req).
 
 
