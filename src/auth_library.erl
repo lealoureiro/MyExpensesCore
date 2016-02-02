@@ -27,7 +27,7 @@ login(Username, Password) ->
         {ok, Username, HashPasswordString, Name} ->
           case createSession(UserId) of
             {ok, Token} ->
-              {Token, list_to_binary(uuid:uuid_to_string(UserId)), Name};
+              {list_to_binary(Token), list_to_binary(uuid:uuid_to_string(UserId)), Name};
             _ ->
               {error}
           end;
