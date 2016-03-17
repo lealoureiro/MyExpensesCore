@@ -98,7 +98,7 @@ createSession(ClientId) ->
   End = Timestamp + 300,
   Fun = fun() ->
     mnesia:write(#sessions{token = Token, client_id = ClientId, started = Timestamp, ended = 0, last_heart_beat = End, valid = 1})
-  end,
+        end,
   Result = mnesia:transaction(Fun),
   case Result of
     {atomic, ok} ->
@@ -130,7 +130,7 @@ auth(Token) ->
       _ ->
         not_found
     end
-  end,
+                  end,
   Sessions = mnesia:transaction(CheckTokenFun),
   case Sessions of
     {atomic, {ok, Session}} ->
@@ -152,7 +152,7 @@ logout(Token) ->
       _ ->
         not_found
     end
-  end,
+                  end,
   Sessions = mnesia:transaction(CheckTokenFun),
   case Sessions of
     {atomic, ok} ->
@@ -169,9 +169,7 @@ hexstring(<<X:256/big-unsigned-integer>>) ->
   lists:flatten(io_lib:format("~64.16.0b", [X])).
 
 unixTimeStamp() ->
-  {Mega, Secs, _} = now(),
-  Timestamp = Mega * 1000000 + Secs,
-  Timestamp.
+  erlang:system_time(seconds).
 
 
 show_sessions() ->

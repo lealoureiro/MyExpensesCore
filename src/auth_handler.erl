@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @author leandroloureiro
+%%% @author Leandro Loureiro
 %%% @copyright (C) 2014, <COMPANY>
 %%% @doc
 %%%
