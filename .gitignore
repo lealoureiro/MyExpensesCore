@@ -10,3 +10,6 @@ erl_crash.dump
 _rel
 ebin
 relx
+deploy
+.erlang.mk/
+install.sh
