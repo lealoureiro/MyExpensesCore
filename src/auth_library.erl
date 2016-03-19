@@ -1,6 +1,6 @@
 %%%-------------------------------------------------------------------
-%%% @author leandroloureiro
-%%% @copyright (C) 2014, <COMPANY>
+%%% @author Leandro Loureiro
+%%% @copyright (C) 2014
 %%% @doc
 %%%
 %%% @end
@@ -9,7 +9,7 @@
 -module(auth_library).
 -author("leandroloureiro").
 
--include("include/sessions_records.hrl").
+-include("sessions_records.hrl").
 -include("deps/cqerl/include/cqerl.hrl").
 
 %% API
