@@ -1,5 +1,4 @@
 
-%% @doc Expenses Gateway Root Handler.
 -module(expenses_handler).
 
 -export([init/3]).

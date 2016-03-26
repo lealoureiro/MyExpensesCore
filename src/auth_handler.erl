@@ -9,7 +9,6 @@
 -module(auth_handler).
 -author("leandroloureiro").
 
-%% API
 -export([init/3]).
 -export([handle/2]).
 -export([terminate/3]).

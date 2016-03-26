@@ -1,16 +1,12 @@
-%% Feel free to use, reuse and abuse the code in this file.
 
-%% @private
 -module(expenses_gateway_app).
 -behaviour(application).
 
--include("include/sessions_records.hrl").
+-include("sessions_records.hrl").
 
-%% API.
 -export([start/2]).
 -export([stop/1]).
 
-%% API.
 
 
 start(_Type, _Args) ->
@@ -18,8 +14,9 @@ start(_Type, _Args) ->
   startDatabase(),
   Dispatch = cowboy_router:compile([
     {'_', [
-     {"/expenses/[...]", expenses_handler, []},
-      {"/auth/[...]", auth_handler, []}
+      {"/expenses/[...]", expenses_handler, []},
+      {"/auth/[...]", auth_handler, []},
+      {"/sessions", sessions_handler, []}
     ]}
   ]),
   lager:log(info, self(), "Starting HTTP Server... ~n"),
@@ -28,7 +25,7 @@ start(_Type, _Args) ->
   ],
     [
       {env, [{dispatch, Dispatch}]},
-      {onresponse, fun custom_onresponse/4}
+      {onresponse, fun custom_on_response/4}
     ]),
   lager:log(info, self(), "Starting CORE Application... ~n"),
   expenses_gateway_sup:start_link().
@@ -42,7 +39,7 @@ startDatabase() ->
   mnesia:create_table(sessions, [{attributes, record_info(fields, sessions)}]).
 
 
-custom_onresponse(StatusCode, Headers, Body, Req) ->
+custom_on_response(StatusCode, Headers, Body, Req) ->
   Headers2 = lists:keyreplace(<<"server">>, 1, Headers, {<<"server">>, <<"MyExpensesCore Server v0.1.0">>}),
   {ok, Req2} = cowboy_req:reply(StatusCode, Headers2, Body, Req),
   Req2.

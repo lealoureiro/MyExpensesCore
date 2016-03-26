@@ -10,16 +10,14 @@
 -author("leandroloureiro").
 
 
--include("deps/cqerl/include/cqerl.hrl").
+-include_lib("cqerl/include/cqerl.hrl").
 
-%% API
 -export([get_transactions/2, get_accounts/1, get_all_categories/0, get_all_subcategories/0, add_transaction/7, check_account_auth/2]).
 -export([get_account_user_id/1]).
 -export([get_accounts_aux/1]).
 -export([get_account_sum/1]).
 -export([add_account/5]).
 
-%% DEV
 -export([get_transactions_aux/1]).
 
 get_account_user_id(AccountId) ->
@@ -106,7 +104,7 @@ get_accounts_aux(ClientId) ->
           Accounts = cqerl:all_rows(Result),
           GetAccountsDetailMap = fun(Account) ->
             AccountId = proplists:get_value(account_id, Account),
-            AccountInfo = get_account_datail_info(AccountId),
+            AccountInfo = get_account_detail_info(AccountId),
             lists:concat([Account, AccountInfo])
           end,
           lists:map(GetAccountsDetailMap, Accounts);
@@ -119,7 +117,7 @@ get_accounts_aux(ClientId) ->
   end.
 
 
-get_account_datail_info(AccountId) ->
+get_account_detail_info(AccountId) ->
   case cqerl:new_client() of
     {ok, Client} ->
       case cqerl:run_query(Client, #cql_query{statement = <<"SELECT account_type,currency,name,start_balance FROM accounts WHERE account_id = ?">>, values = [{account_id, AccountId}]}) of

@@ -10,7 +10,7 @@
 -author("leandroloureiro").
 
 -include("sessions_records.hrl").
--include("deps/cqerl/include/cqerl.hrl").
+-include_lib("cqerl/include/cqerl.hrl").
 
 %% API
 -export([login/2, auth/1, logout/1, get_user_id/1, get_user_data/1, show_sessions/0, generate_token/2]).
@@ -20,7 +20,7 @@ login(Username, Password) when is_list(Username) ->
 
 login(Username, Password) ->
   HashPassword = crypto:hash(sha512, Password),
-  HashPasswordString = list_to_binary(hexstring(HashPassword)),
+  HashPasswordString = list_to_binary(hex_string(HashPassword)),
   case get_user_id(Username) of
     {ok, UserId} ->
       case get_user_data(UserId) of
@@ -161,11 +161,11 @@ logout(Token) ->
       not_valid
   end.
 
-hexstring(<<X:512/big-unsigned-integer>>) ->
+hex_string(<<X:512/big-unsigned-integer>>) ->
   lists:flatten(io_lib:format("~128.16.0b", [X]));
 
 
-hexstring(<<X:256/big-unsigned-integer>>) ->
+hex_string(<<X:256/big-unsigned-integer>>) ->
   lists:flatten(io_lib:format("~64.16.0b", [X])).
 
 unixTimeStamp() ->
@@ -178,8 +178,8 @@ show_sessions() ->
 
 show_session_record([H | Tail]) ->
   #sessions{token = T, client_id = C, started = S, ended = E, last_heart_beat = L, valid = V} = H,
-  Uiid = uuid:uuid_to_string(C),
-  lager:log(info, self(), "User: ~s~nToken: ~s~nStarted: ~B    Last Activity: ~B     Ended: ~B     Valid: ~B~n~n", [Uiid, T, S, L, E, V]),
+  UUID = uuid:uuid_to_string(C),
+  lager:log(info, self(), "User: ~s~nToken: ~s~nStarted: ~B    Last Activity: ~B     Ended: ~B     Valid: ~B~n~n", [UUID, T, S, L, E, V]),
   show_session_record(Tail);
 
 show_session_record([]) ->
