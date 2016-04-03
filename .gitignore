@@ -12,4 +12,4 @@ ebin
 relx
 deploy
 .erlang.mk/
-install.sh
+*install.sh

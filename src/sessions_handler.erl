@@ -24,9 +24,11 @@ get_json(Req, State) ->
   lager:log(info, self(), "Requested check authentication ~n"),
   case cowboy_req:header(<<"authkey">>, Req) of
     {undefined, _} ->
-      access_denied(Req);
-    {_, _} ->
-      {<<"">>, Req, State}
+      lager:log(info, self(), "Request auth key missing!"),
+      access_denied(Req),
+      {halt, Req, State};
+    {Key, _} ->
+      {Key, Req, State}
   end.
 
 access_denied(Req) ->
