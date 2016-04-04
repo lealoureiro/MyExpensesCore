@@ -12,24 +12,78 @@
 %% API
 -export([init/3]).
 -export([content_types_provided/2]).
+-export([allowed_methods/2]).
+-export([content_types_accepted/2]).
 -export([get_json/2]).
+-export([process_post/2]).
+-export([delete_resource/2]).
+
 
 init(_Transport, _Req, []) ->
   {upgrade, protocol, cowboy_rest}.
 
+
+allowed_methods(Req, State) ->
+  {[<<"POST">>, <<"GET">>, <<"DELETE">>, <<"OPTIONS">>], Req, State}.
+
+
 content_types_provided(Req, State) ->
   {[{<<"application/json">>, get_json}], Req, State}.
 
+content_types_accepted(Req, State) ->
+  {[{<<"application/json">>, process_post}], Req, State}.
+
+
 get_json(Req, State) ->
-  lager:log(info, self(), "Requested check authentication ~n"),
+  lager:log(info, self(), "Requested session information ~n"),
   case cowboy_req:header(<<"authkey">>, Req) of
     {undefined, _} ->
       lager:log(info, self(), "Request auth key missing!"),
-      access_denied(Req),
+      cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], Req),
       {halt, Req, State};
-    {Key, _} ->
-      {Key, Req, State}
+    {Token, _} ->
+      case auth_library:auth(Token) of
+        {ok, ClientId} ->
+          Output = {[{<<"clientId">>, list_to_binary(uuid:uuid_to_string(ClientId))}]},
+          {jiffy:encode(Output), Req, State};
+        not_valid ->
+          cowboy_req:reply(401, [{<<"connection">>, <<"close">>}], Req),
+          {halt, Req, State}
+      end
   end.
 
-access_denied(Req) ->
-  cowboy_req:reply(403, [{<<"connection">>, <<"close">>}], Req).
+process_post(Req, State) ->
+  lager:log(info, self(), "Requested new session"),
+  {ok, Body, Req2} = cowboy_req:body(Req),
+  try
+    {Data} = jiffy:decode(Body),
+    Username = proplists:get_value(<<"username">>, Data),
+    Password = proplists:get_value(<<"password">>, Data),
+    case auth_library:login(Username, Password) of
+      not_found ->
+        cowboy_req:reply(401, [{<<"connection">>, <<"close">>}], Req);
+      {Token, Id, Name} ->
+        Output = {[{<<"token">>, Token}, {<<"id">>, Id}, {<<"name">>, Name}]},
+        JSON = jiffy:encode(Output),
+        cowboy_req:reply(200, [{<<"content-type">>, <<"application/json; charset=utf-8">>}], JSON, Req2)
+    end
+  catch
+    throw:{error, _} -> cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], Req2)
+  end,
+  {halt, Req2, State}.
+
+delete_resource(Req, State) ->
+  lager:log(info, self(), "Requested delete session ~n"),
+  case cowboy_req:header(<<"authkey">>, Req) of
+    {undefined, _} ->
+      lager:log(info, self(), "Request auth key missing!"),
+      cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], Req),
+      {halt, Req, State};
+    {Token, _} ->
+      case auth_library:logout(binary_to_list(Token)) of
+        ok ->
+          {true, Req, State};
+        not_valid ->
+          {false, Req, State}
+      end
+  end.

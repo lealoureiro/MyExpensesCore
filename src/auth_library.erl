@@ -117,8 +117,10 @@ generate_token(TokenPart, _) ->
   NewToken = string:substr(string:concat(TokenPart, TokenFiltered), 1, 128),
   generate_token(NewToken, string:len(NewToken)).
 
+auth(Token) when is_binary(Token) ->
+  auth(binary_to_list(Token));
 
-auth(Token) ->
+auth(Token) when is_list(Token) ->
   CheckTokenFun = fun() ->
     [Session] = mnesia:read(sessions, Token, read),
     case Session#sessions.valid of
@@ -137,7 +139,7 @@ auth(Token) ->
       ClientId = Session#sessions.client_id,
       {ok, ClientId};
     _ ->
-      {not_valid}
+      not_valid
   end.
 
 
