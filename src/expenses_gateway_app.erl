@@ -15,8 +15,7 @@ start(_Type, _Args) ->
   Dispatch = cowboy_router:compile([
     {'_', [
       {"/expenses/[...]", expenses_handler, []},
-      {"/auth/[...]", auth_handler, []},
-      {"/sessions", sessions_handler, []}
+      {"/keys/", keys_handler, []}
     ]}
   ]),
   lager:log(info, self(), "Starting HTTP Server... ~n"),

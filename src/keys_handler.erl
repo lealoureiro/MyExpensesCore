@@ -6,7 +6,7 @@
 %%% @end
 %%% Created : 20. Mar 2016 21:21
 %%%-------------------------------------------------------------------
--module(sessions_handler).
+-module(keys_handler).
 -author("leandroloureiro").
 
 %% API
@@ -62,8 +62,8 @@ process_post(Req, State) ->
     case auth_library:login(Username, Password) of
       not_found ->
         cowboy_req:reply(401, [{<<"connection">>, <<"close">>}], Req);
-      {Token, Id, Name} ->
-        Output = {[{<<"token">>, Token}, {<<"id">>, Id}, {<<"name">>, Name}]},
+      {Key, Id, Name} ->
+        Output = {[{<<"key">>, Key}, {<<"id">>, Id}, {<<"name">>, Name}]},
         JSON = jiffy:encode(Output),
         cowboy_req:reply(200, [{<<"content-type">>, <<"application/json; charset=utf-8">>}], JSON, Req2)
     end
@@ -79,8 +79,8 @@ delete_resource(Req, State) ->
       lager:log(info, self(), "Request auth key missing!"),
       cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], Req),
       {halt, Req, State};
-    {Token, _} ->
-      case auth_library:logout(binary_to_list(Token)) of
+    {Key, _} ->
+      case auth_library:logout(binary_to_list(Key)) of
         ok ->
           {true, Req, State};
         not_valid ->
