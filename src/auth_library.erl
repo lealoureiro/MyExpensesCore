@@ -149,7 +149,7 @@ logout(Token) ->
     case Session#sessions.valid of
       1 ->
         HeartBeat = unixTimeStamp(),
-        SessionUpdated = Session#sessions{last_heart_beat = HeartBeat, valid = 0},
+        SessionUpdated = Session#sessions{last_heart_beat = HeartBeat, valid = 0, ended = 1},
         mnesia:write(SessionUpdated);
       _ ->
         not_found

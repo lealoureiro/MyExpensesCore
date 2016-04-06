@@ -17,7 +17,6 @@
 -export([get_json/2]).
 -export([process_post/2]).
 -export([delete_resource/2]).
--export([resource_exists/2]).
 
 
 init(_Transport, _Req, []) ->
@@ -76,9 +75,6 @@ process_post(Req, State) ->
   catch
     throw:{error, _} -> cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], Req1)
   end.
-
-resource_exists(Req, State) ->
-  {false, Req, State}.
 
 
 delete_resource(Req, State) ->

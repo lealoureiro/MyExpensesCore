@@ -25,7 +25,7 @@ maybe_reply(<<"POST">>, _, Req) ->
   case auth_library:auth(AccessToken) of
     {ok, ClientId} ->
       process(Path, ClientId, PostVals, Req3);
-    {not_valid} ->
+    not_valid ->
       access_denied(Req);
     _ ->
       server_error(Req)
