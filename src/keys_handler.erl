@@ -62,6 +62,8 @@ process_post(Req, State) ->
     case auth_library:login(Username, Password) of
       not_found ->
         cowboy_req:reply(401, [{<<"connection">>, <<"close">>}], Req);
+      invalid_password ->
+        cowboy_req:reply(401, [{<<"connection">>, <<"close">>}], Req);
       {Key, Id, Name} ->
         Output = {[{<<"key">>, Key}, {<<"id">>, Id}, {<<"name">>, Name}]},
         JSON = jiffy:encode(Output),
