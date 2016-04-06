@@ -68,7 +68,7 @@ process_post(Req, State) ->
         cowboy_req:reply(401, [{<<"connection">>, <<"close">>}], Req1),
         {halt, Req1, State};
       {Key, Id, Name} ->
-        Output = {[{<<"key">>, Key}, {<<"id">>, Id}, {<<"name">>, Name}]},
+        Output = {[{<<"key">>, Key}, {<<"clientId">>, Id}, {<<"clientName">>, Name}]},
         JSON = jiffy:encode(Output),
         Resp = cowboy_req:set_resp_body(JSON, Req),
         {true, Resp, State}
