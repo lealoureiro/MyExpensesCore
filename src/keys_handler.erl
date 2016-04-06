@@ -17,6 +17,7 @@
 -export([get_json/2]).
 -export([process_post/2]).
 -export([delete_resource/2]).
+-export([resource_exists/2]).
 
 
 init(_Transport, _Req, []) ->
@@ -54,25 +55,31 @@ get_json(Req, State) ->
 
 process_post(Req, State) ->
   lager:log(info, self(), "Requested new session"),
-  {ok, Body, Req2} = cowboy_req:body(Req),
+  {ok, Body, Req1} = cowboy_req:body(Req),
   try
     {Data} = jiffy:decode(Body),
     Username = proplists:get_value(<<"username">>, Data),
     Password = proplists:get_value(<<"password">>, Data),
     case auth_library:login(Username, Password) of
       not_found ->
-        cowboy_req:reply(401, [{<<"connection">>, <<"close">>}], Req);
+        cowboy_req:reply(401, [{<<"connection">>, <<"close">>}], Req1),
+        {halt, Req1, State};
       invalid_password ->
-        cowboy_req:reply(401, [{<<"connection">>, <<"close">>}], Req);
+        cowboy_req:reply(401, [{<<"connection">>, <<"close">>}], Req1),
+        {halt, Req1, State};
       {Key, Id, Name} ->
         Output = {[{<<"key">>, Key}, {<<"id">>, Id}, {<<"name">>, Name}]},
         JSON = jiffy:encode(Output),
-        cowboy_req:reply(200, [{<<"content-type">>, <<"application/json; charset=utf-8">>}], JSON, Req2)
+        Resp = cowboy_req:set_resp_body(JSON, Req),
+        {true, Resp, State}
     end
   catch
-    throw:{error, _} -> cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], Req2)
-  end,
-  {halt, Req2, State}.
+    throw:{error, _} -> cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], Req1)
+  end.
+
+resource_exists(Req, State) ->
+  {false, Req, State}.
+
 
 delete_resource(Req, State) ->
   lager:log(info, self(), "Requested delete session ~n"),

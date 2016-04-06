@@ -176,13 +176,14 @@ unixTimeStamp() ->
 
 show_sessions() ->
   Sessions = mnesia:async_dirty(fun() -> qlc:e(mnesia:table(sessions)) end),
-  show_session_record(Sessions).
+  show_session_record(Sessions, 0).
 
-show_session_record([H | Tail]) ->
+show_session_record([H | Tail], Count) ->
   #sessions{token = T, client_id = C, started = S, ended = E, last_heart_beat = L, valid = V} = H,
   UUID = uuid:uuid_to_string(C),
   lager:log(info, self(), "User: ~s~nToken: ~s~nStarted: ~B    Last Activity: ~B     Ended: ~B     Valid: ~B~n~n", [UUID, T, S, L, E, V]),
-  show_session_record(Tail);
+  show_session_record(Tail, Count + 1);
 
-show_session_record([]) ->
+show_session_record([], Count) ->
+  lager:log(info, self(), "Sessions: ~B~n", [Count]),
   ok.
