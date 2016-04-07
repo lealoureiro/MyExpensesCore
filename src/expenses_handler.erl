@@ -46,7 +46,7 @@ process(<<"/expenses/echo">>, _, PostVals, Req) ->
   end;
 
 process(<<"/expenses/get_transactions">>, ClientId, PostVals, Req) ->
-  Acct = proplists:get_value(<<"acct">>, PostVals),
+  Acct = proplists:get_value(<<"account">>, PostVals),
   lager:log(info, self(), "Processing transactions, Client ~s Acccount: ~s ~n", [uuid:uuid_to_string(ClientId), Acct]),
   case Acct of
     undefined ->
@@ -69,9 +69,9 @@ process(<<"/expenses/get_transactions">>, ClientId, PostVals, Req) ->
             ExtRef = proplists:get_value(external_reference, Transaction),
             case ExtRef of
               undefined ->
-                {[{<<"id">>, Id}, {<<"desc">>, Description}, {<<"ctgId">>, CtgID}, {<<"subCtgId">>, SubCtgId}, {<<"datetime">>, Datetime}, {<<"amt">>, Amt}, {<<"extRef">>, null}]};
+                {[{<<"id">>, Id}, {<<"description">>, Description}, {<<"categoryId">>, CtgID}, {<<"subCategoryId">>, SubCtgId}, {<<"datetime">>, Datetime}, {<<"amount">>, Amt}, {<<"externalReference">>, null}]};
               _ ->
-                {[{<<"id">>, Id}, {<<"desc">>, Description}, {<<"ctgId">>, CtgID}, {<<"subCtgId">>, SubCtgId}, {<<"datetime">>, Datetime}, {<<"amt">>, Amt}, {<<"extRef">>, ExtRef}]}
+                {[{<<"id">>, Id}, {<<"description">>, Description}, {<<"categoryId">>, CtgID}, {<<"subCategoryId">>, SubCtgId}, {<<"datetime">>, Datetime}, {<<"amount">>, Amt}, {<<"externalReference">>, ExtRef}]}
             end
           end,
           Data = lists:map(Mapping, Transactions),
@@ -96,7 +96,7 @@ process(<<"/expenses/get_accounts">>, ClientId, _, Req) ->
         StartBalance = proplists:get_value(start_balance, Account),
         Currency = proplists:get_value(currency, Account),
         Balance = proplists:get_value(balance, Account),
-        {[{<<"acct">>, AccountId}, {<<"name">>, AccountName}, {<<"type">>, AcctType}, {<<"startBal">>, StartBalance}, {<<"cur">>, Currency}, {<<"bal">>, Balance}]}
+        {[{<<"id">>, AccountId}, {<<"name">>, AccountName}, {<<"type">>, AcctType}, {<<"startBalance">>, StartBalance}, {<<"currency">>, Currency}, {<<"balance">>, Balance}]}
       end,
       Data = lists:map(Map, Accounts),
       reply(Data, Req);
@@ -133,7 +133,7 @@ process(<<"/expenses/get_categories">>, _, _, Req) ->
 
 
 process(<<"/expenses/add_transaction">>, ClientId, PostVals, Req) ->
-  Account = proplists:get_value(<<"acct">>, PostVals),
+  Account = proplists:get_value(<<"account">>, PostVals),
   case Account of
     undefined ->
       missing_parameter(Req);
@@ -177,20 +177,20 @@ process(_, _, _, Req) ->
 
 
 add_transaction(Account, PostVals, Req) ->
-  Valid = proplists:is_defined(<<"dsc">>, PostVals)
-    and proplists:is_defined(<<"cat">>, PostVals)
-    and proplists:is_defined(<<"subCat">>, PostVals)
-    and proplists:is_defined(<<"amt">>, PostVals)
+  Valid = proplists:is_defined(<<"description">>, PostVals)
+    and proplists:is_defined(<<"category">>, PostVals)
+    and proplists:is_defined(<<"subCategory">>, PostVals)
+    and proplists:is_defined(<<"amount">>, PostVals)
     and proplists:is_defined(<<"timestamp">>, PostVals)
     and proplists:is_defined(<<"tags">>, PostVals),
   case Valid of
     false ->
       missing_parameter(Req);
     true ->
-      Description = proplists:get_value(<<"dsc">>, PostVals),
-      Category = binary_to_list(proplists:get_value(<<"cat">>, PostVals)),
-      SubCategory = binary_to_list(proplists:get_value(<<"subCat">>, PostVals)),
-      {Amount, _} = string:to_float(binary_to_list(proplists:get_value(<<"amt">>, PostVals))),
+      Description = proplists:get_value(<<"description">>, PostVals),
+      Category = binary_to_list(proplists:get_value(<<"category">>, PostVals)),
+      SubCategory = binary_to_list(proplists:get_value(<<"subCategory">>, PostVals)),
+      {Amount, _} = string:to_float(binary_to_list(proplists:get_value(<<"amount">>, PostVals))),
       {Timestamp, _} = string:to_integer(binary_to_list(proplists:get_value(<<"timestamp">>, PostVals))),
       Tags = proplists:get_value(<<"tags">>, PostVals),
       TagsList = string:tokens(binary_to_list(Tags), ","),

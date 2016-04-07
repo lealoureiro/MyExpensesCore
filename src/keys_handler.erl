@@ -35,10 +35,10 @@ content_types_accepted(Req, State) ->
 
 
 get_json(Req, State) ->
-  lager:log(info, self(), "Requested session information ~n"),
+  lager:log(info, self(), "Requested Key information ~n"),
   case cowboy_req:header(<<"authkey">>, Req) of
     {undefined, _} ->
-      lager:log(info, self(), "Request auth key missing!"),
+      lager:log(info, self(), "Request Key missing!"),
       cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], Req),
       {halt, Req, State};
     {Token, _} ->
@@ -53,7 +53,7 @@ get_json(Req, State) ->
   end.
 
 process_post(Req, State) ->
-  lager:log(info, self(), "Requested new session"),
+  lager:log(info, self(), "Requested new Key"),
   {ok, Body, Req1} = cowboy_req:body(Req),
   try
     {Data} = jiffy:decode(Body),
@@ -78,10 +78,10 @@ process_post(Req, State) ->
 
 
 delete_resource(Req, State) ->
-  lager:log(info, self(), "Requested delete session ~n"),
+  lager:log(info, self(), "Requested delete Key ~n"),
   case cowboy_req:header(<<"authkey">>, Req) of
     {undefined, _} ->
-      lager:log(info, self(), "Request auth key missing!"),
+      lager:log(info, self(), "Request Key missing!"),
       cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], Req),
       {halt, Req, State};
     {Key, _} ->
