@@ -1,4 +1,3 @@
-
 -module(expenses_gateway_app).
 -behaviour(application).
 
@@ -15,7 +14,8 @@ start(_Type, _Args) ->
   Dispatch = cowboy_router:compile([
     {'_', [
       {"/expenses/[...]", expenses_handler, []},
-      {"/keys/", keys_handler, []}
+      {"/keys/", keys_handler, []},
+      {"/accounts/[:id]", accounts_handler, []}
     ]}
   ]),
   lager:log(info, self(), "Starting HTTP Server... ~n"),
