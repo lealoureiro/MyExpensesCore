@@ -56,7 +56,7 @@ content_types_provided(Req, State) ->
 
 get_json(Req, State) ->
   {ClientId, _} = cowboy_req:meta(<<"clientId">>, Req),
-  Accounts = expenses_library:get_accounts(ClientId),
+  Accounts = expenses_library:get_client_accounts(ClientId),
   case Accounts of
     not_found ->
       {<<"[]">>, Req, State};
@@ -67,8 +67,7 @@ get_json(Req, State) ->
         AcctType = proplists:get_value(account_type, Account),
         StartBalance = proplists:get_value(start_balance, Account),
         Currency = proplists:get_value(currency, Account),
-        Balance = proplists:get_value(balance, Account),
-        {[{<<"id">>, AccountId}, {<<"name">>, AccountName}, {<<"type">>, AcctType}, {<<"startBalance">>, StartBalance}, {<<"currency">>, Currency}, {<<"balance">>, Balance}]}
+        {[{<<"id">>, AccountId}, {<<"name">>, AccountName}, {<<"type">>, AcctType}, {<<"startBalance">>, StartBalance}, {<<"currency">>, Currency}]}
             end,
       Data = lists:map(Map, Accounts),
       JSON = jiffy:encode(Data),

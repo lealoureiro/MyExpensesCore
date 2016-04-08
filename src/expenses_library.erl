@@ -12,13 +12,15 @@
 
 -include_lib("cqerl/include/cqerl.hrl").
 
--export([get_transactions/2, get_accounts/1, get_all_categories/0, get_all_subcategories/0, add_transaction/7, check_account_auth/2]).
+-export([get_transactions/2, get_all_categories/0, get_all_subcategories/0, add_transaction/7, check_account_auth/2]).
 -export([get_account_user_id/1]).
--export([get_accounts_aux/1]).
+-export([get_client_accounts/1]).
 -export([get_account_sum/1]).
 -export([add_account/5]).
+-export([get_account_info/1]).
 
 -export([get_transactions_aux/1]).
+-export([create_accounts_query/1]).
 
 get_account_user_id(AccountId) ->
   try
@@ -78,36 +80,15 @@ get_transactions_aux(AccountId) ->
     exit:badarg -> not_found
   end.
 
-
-get_accounts(ClientId) ->
-  Accounts = get_accounts_aux(ClientId),
-  case Accounts of
-    [_ | _] ->
-      ProcessedBalances = fun(Account) ->
-        Balance = get_account_sum(proplists:get_value(account_id, Account)),
-        lists:concat([Account, [{balance, Balance}]])
-      end,
-      lists:map(ProcessedBalances, Accounts);
-    [] ->
-      [];
-    _ ->
-      system_error
-  end.
-
-
-get_accounts_aux(ClientId) ->
+get_client_accounts(ClientId) ->
   case cqerl:new_client() of
     {ok, Client} ->
       case cqerl:run_query(Client, #cql_query{statement = <<"SELECT account_id FROM accounts_by_user WHERE user_id = ?">>, values = [{user_id, ClientId}]}) of
         {ok, Result} ->
           cqerl:close_client(Client),
           Accounts = cqerl:all_rows(Result),
-          GetAccountsDetailMap = fun(Account) ->
-            AccountId = proplists:get_value(account_id, Account),
-            AccountInfo = get_account_detail_info(AccountId),
-            lists:concat([Account, AccountInfo])
-          end,
-          lists:map(GetAccountsDetailMap, Accounts);
+          GetAccountIds = fun(Account) -> uuid:uuid_to_string(proplists:get_value(account_id, Account)) end,
+          get_client_accounts_information(lists:map(GetAccountIds, Accounts));
         _ ->
           cqerl:close_client(Client),
           system_error
@@ -116,8 +97,28 @@ get_accounts_aux(ClientId) ->
       system_error
   end.
 
+get_client_accounts_information(AccountIds) ->
+  AccountsINClause = list_to_binary("(" ++ create_accounts_query(AccountIds)),
+  case cqerl:new_client() of
+    {ok, Client} ->
+      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT * FROM accounts WHERE account_id IN ", AccountsINClause/binary>>}) of
+        {ok, Result} ->
+          cqerl:all_rows(Result);
+        _ ->
+          system_error
+      end;
+    _ ->
+      sytem_error
+  end.
 
-get_account_detail_info(AccountId) ->
+create_accounts_query([T]) ->
+  T ++ ")";
+
+create_accounts_query([H | T]) ->
+  H ++ "," ++ create_accounts_query(T).
+
+
+get_account_info(AccountId) ->
   case cqerl:new_client() of
     {ok, Client} ->
       case cqerl:run_query(Client, #cql_query{statement = <<"SELECT account_type,currency,name,start_balance FROM accounts WHERE account_id = ?">>, values = [{account_id, AccountId}]}) of
@@ -214,7 +215,7 @@ add_transaction(AccountId, Description, Category, SubCategory, Amount, Timestamp
         {ok, void} ->
           AddTagsMap = fun(Tag) ->
             add_tag_to_transaction(TransactionId, Tag)
-          end,
+                       end,
           Results = lists:map(AddTagsMap, Tags),
           ResultOk = fun(SingleResult) -> SingleResult == ok end,
           case lists:all(ResultOk, Results) of
