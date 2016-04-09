@@ -15,10 +15,9 @@
 -export([get_transactions/2, get_all_categories/0, get_all_subcategories/0, add_transaction/7, check_account_auth/2]).
 -export([get_account_user_id/1]).
 -export([get_client_accounts/1]).
--export([get_account_sum/1]).
 -export([add_account/5]).
 -export([get_account_info/1]).
-
+-export([get_account_transactions_balance/1]).
 -export([get_transactions_aux/1]).
 -export([create_accounts_query/1]).
 
@@ -121,7 +120,7 @@ create_accounts_query([H | T]) ->
 get_account_info(AccountId) ->
   case cqerl:new_client() of
     {ok, Client} ->
-      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT account_type,currency,name,start_balance FROM accounts WHERE account_id = ?">>, values = [{account_id, AccountId}]}) of
+      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT account_id, account_type,currency,name,start_balance FROM accounts WHERE account_id = ?">>, values = [{account_id, AccountId}]}) of
         {ok, Result} ->
           cqerl:close_client(Client),
           cqerl:head(Result);
@@ -134,29 +133,19 @@ get_account_info(AccountId) ->
   end.
 
 
-get_account_sum(AccountId) ->
+get_account_transactions_balance(AccountId) ->
   case cqerl:new_client() of
     {ok, Client} ->
-      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT amount FROM transactions WHERE account_id = ?">>, values = [{account_id, AccountId}], page_size = 10000}) of
+      case cqerl:run_query(Client, #cql_query{statement = <<"select count(*) as transactions, sum(amount) as balance from transactions WHERE account_id = ?">>, values = [{account_id, AccountId}]}) of
         {ok, Result} ->
           cqerl:close_client(Client),
-          Values = cqerl:all_rows(Result),
-          sum_transactions_amount(Values);
+          cqerl:head(Result);
         _ ->
           system_error
       end;
     _ ->
       system_error
   end.
-
-sum_transactions_amount(Values) ->
-  sum_transactions_amount(Values, 0).
-
-sum_transactions_amount([H | T], Acc) ->
-  Amount = proplists:get_value(amount, H),
-  sum_transactions_amount(T, Amount + Acc);
-
-sum_transactions_amount([], Acc) -> Acc.
 
 
 get_all_categories() ->

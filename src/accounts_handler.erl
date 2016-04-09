@@ -40,7 +40,7 @@ is_authorized(Req, State) ->
                 valid ->
                   lager:log(info, self(), "Client ~s requested account ~s ~n", [uuid:uuid_to_string(ClientId), AccountId]),
                   Req2 = cowboy_req:set_meta(<<"clientId">>, ClientId, Req),
-                  Req3 = cowboy_req:set_meta(<<"accountId">>, ClientId, Req2),
+                  Req3 = cowboy_req:set_meta(<<"accountId">>, AccountId, Req2),
                   {true, Req3, State};
                 _ ->
                   {{false, <<"Key">>}, Req, State}
@@ -56,6 +56,15 @@ content_types_provided(Req, State) ->
 
 get_json(Req, State) ->
   {ClientId, _} = cowboy_req:meta(<<"clientId">>, Req),
+  case cowboy_req:meta(<<"accountId">>, Req) of
+    {undefined, _} ->
+      get_all_accounts(ClientId, Req, State);
+    {AccountId, _} ->
+      get_account_detail_info(AccountId, Req, State)
+  end.
+
+
+get_all_accounts(ClientId, Req, State) ->
   Accounts = expenses_library:get_client_accounts(ClientId),
   case Accounts of
     not_found ->
@@ -76,4 +85,30 @@ get_json(Req, State) ->
       {<<"[]">>, Req, State};
     _ ->
       {false, Req, State}
+  end.
+
+get_account_detail_info(AccountId, Req, State) ->
+  lager:log(info, self(), "Fetching information for account ~s ~n", [AccountId]),
+  case expenses_library:get_account_info(AccountId) of
+    system_error ->
+      cowboy_req:reply(500, [{<<"connection">>, <<"close">>}], Req),
+      {halt, Req, State};
+    Account ->
+      case expenses_library:get_account_transactions_balance(AccountId) of
+
+        system_error ->
+          cowboy_req:reply(500, [{<<"connection">>, <<"close">>}], Req),
+          {halt, Req, State};
+        AccountBalance ->
+          AccountIdString = list_to_binary(uuid:uuid_to_string(proplists:get_value(account_id, Account))),
+          AccountName = proplists:get_value(name, Account),
+          AcctType = proplists:get_value(account_type, Account),
+          StartBalance = proplists:get_value(start_balance, Account),
+          Currency = proplists:get_value(currency, Account),
+          Balance = proplists:get_value(balance, AccountBalance),
+          Transactions = proplists:get_value(transactions, AccountBalance),
+          Data = {[{<<"id">>, AccountIdString}, {<<"name">>, AccountName}, {<<"type">>, AcctType}, {<<"balance">>, Balance}, {<<"transactions">>, Transactions}, {<<"startBalance">>, StartBalance}, {<<"currency">>, Currency}]},
+          JSON = jiffy:encode(Data),
+          {JSON, Req, State}
+      end
   end.
