@@ -29,7 +29,7 @@ login(Username, Password) ->
             {ok, Token} ->
               {list_to_binary(Token), list_to_binary(uuid:uuid_to_string(UserId)), Name};
             _ ->
-              {error}
+              error
           end;
         error ->
           error;

@@ -66,6 +66,9 @@ process_post(Req, State) ->
       invalid_password ->
         cowboy_req:reply(401, [{<<"connection">>, <<"close">>}], Req1),
         {halt, Req1, State};
+      error ->
+        lager:log(info, self(), "Problem to create Key for user ~s~n", [Username]),
+        {false, Req, State};
       {Key, Id, Name} ->
         Output = {[{<<"key">>, Key}, {<<"clientId">>, Id}, {<<"clientName">>, Name}]},
         JSON = jiffy:encode(Output),

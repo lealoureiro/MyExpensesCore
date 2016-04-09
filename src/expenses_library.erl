@@ -85,9 +85,13 @@ get_client_accounts(ClientId) ->
       case cqerl:run_query(Client, #cql_query{statement = <<"SELECT account_id FROM accounts_by_user WHERE user_id = ?">>, values = [{user_id, ClientId}]}) of
         {ok, Result} ->
           cqerl:close_client(Client),
-          Accounts = cqerl:all_rows(Result),
-          GetAccountIds = fun(Account) -> uuid:uuid_to_string(proplists:get_value(account_id, Account)) end,
-          get_client_accounts_information(lists:map(GetAccountIds, Accounts));
+          case cqerl:all_rows(Result) of
+            [] ->
+              [];
+            Accounts ->
+              GetAccountIds = fun(Account) -> uuid:uuid_to_string(proplists:get_value(account_id, Account)) end,
+              get_client_accounts_information(lists:map(GetAccountIds, Accounts))
+          end;
         _ ->
           cqerl:close_client(Client),
           system_error
