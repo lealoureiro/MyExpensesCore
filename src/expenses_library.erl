@@ -18,7 +18,7 @@
 -export([add_account/5]).
 -export([get_account_info/1]).
 -export([get_account_transactions_balance/1]).
--export([get_transactions_aux/1]).
+-export([get_account_transactions/1]).
 -export([create_accounts_query/1]).
 
 get_account_user_id(AccountId) ->
@@ -51,7 +51,7 @@ get_account_user_id(AccountId) ->
 get_transactions(ClientId, AccountId) ->
   case get_account_user_id(AccountId) of
     {ok, ClientId} ->
-      get_transactions_aux(AccountId);
+      get_account_transactions(AccountId);
     {ok, _} ->
       access_denied;
     _ ->
@@ -59,7 +59,7 @@ get_transactions(ClientId, AccountId) ->
   end.
 
 
-get_transactions_aux(AccountId) ->
+get_account_transactions(AccountId) ->
   try
     AccountIdUUID = uuid:string_to_uuid(AccountId),
     case cqerl:new_client() of
