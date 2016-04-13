@@ -1,6 +1,6 @@
 %%%-------------------------------------------------------------------
-%%% @author leandroloureiro
-%%% @copyright (C) 2014, <COMPANY>
+%%% @author Leandro Loureiro
+%%% @copyright (C) 2014
 %%% @doc
 %%%
 %%% @end
@@ -12,51 +12,15 @@
 
 -include_lib("cqerl/include/cqerl.hrl").
 
--export([get_transactions/2, get_all_categories/0, get_all_subcategories/0, add_transaction/7, check_account_auth/2]).
--export([get_account_user_id/1]).
+-export([get_all_categories/0]).
+-export([get_all_subcategories/0]).
+-export([add_transaction/7]).
+-export([check_account_auth/2]).
 -export([get_client_accounts/1]).
 -export([add_account/5]).
 -export([get_account_info/1]).
 -export([get_account_transactions_balance/1]).
 -export([get_account_transactions/1]).
--export([create_accounts_query/1]).
-
-get_account_user_id(AccountId) ->
-  try
-    AccountIdUUID = uuid:string_to_uuid(AccountId),
-    case cqerl:new_client() of
-      {ok, Client} ->
-        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT user_id FROM user_by_account WHERE account_id = ?;">>, values = [{account_id, AccountIdUUID}]}) of
-          {ok, Result} ->
-            Row = cqerl:head(Result),
-            cqerl:close_client(Client),
-            case Row of
-              empty_dataset ->
-                not_found;
-              _ ->
-                UserId = proplists:get_value(user_id, Row),
-                {ok, UserId}
-            end;
-          _ ->
-            cqerl:close_client(Client),
-            error
-        end;
-      _ ->
-        system_error
-    end
-  catch
-    exit:badarg -> not_found
-  end.
-
-get_transactions(ClientId, AccountId) ->
-  case get_account_user_id(AccountId) of
-    {ok, ClientId} ->
-      get_account_transactions(AccountId);
-    {ok, _} ->
-      access_denied;
-    _ ->
-      system_error
-  end.
 
 
 get_account_transactions(AccountId) ->

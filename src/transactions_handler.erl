@@ -14,7 +14,9 @@
 -export([allowed_methods/2]).
 -export([is_authorized/2]).
 -export([content_types_provided/2]).
+-export([content_types_accepted/2]).
 -export([get_json/2]).
+-export([process_post/2]).
 
 init(_Transport, _Req, []) ->
   {upgrade, protocol, cowboy_rest}.
@@ -24,6 +26,9 @@ allowed_methods(Req, State) ->
 
 content_types_provided(Req, State) ->
   {[{<<"application/json">>, get_json}], Req, State}.
+
+content_types_accepted(Req, State) ->
+  {[{<<"application/json">>, process_post}], Req, State}.
 
 is_authorized(Req, State) ->
   case cowboy_req:header(<<"authkey">>, Req) of
@@ -73,9 +78,9 @@ get_account_transactions(AccountId, Req, State) ->
         ExtRef = proplists:get_value(external_reference, Transaction),
         case ExtRef of
           undefined ->
-            {[{<<"id">>, Id}, {<<"description">>, Description}, {<<"categoryId">>, CtgID}, {<<"subCategoryId">>, SubCtgId}, {<<"datetime">>, Datetime}, {<<"amount">>, Amt}, {<<"externalReference">>, null}]};
+            {[{<<"id">>, Id}, {<<"description">>, Description}, {<<"category">>, CtgID}, {<<"subCategory">>, SubCtgId}, {<<"timestamp">>, Datetime}, {<<"amount">>, Amt}, {<<"externalReference">>, null}]};
           _ ->
-            {[{<<"id">>, Id}, {<<"description">>, Description}, {<<"categoryId">>, CtgID}, {<<"subCategoryId">>, SubCtgId}, {<<"datetime">>, Datetime}, {<<"amount">>, Amt}, {<<"externalReference">>, ExtRef}]}
+            {[{<<"id">>, Id}, {<<"description">>, Description}, {<<"category">>, CtgID}, {<<"subCategory">>, SubCtgId}, {<<"timestamp">>, Datetime}, {<<"amount">>, Amt}, {<<"externalReference">>, ExtRef}]}
         end
                 end,
       Data = lists:map(Mapping, Transactions),
@@ -86,3 +91,43 @@ get_account_transactions(AccountId, Req, State) ->
       {JSON, Req, State}
   end.
 
+process_post(Req, State) ->
+  {ClientId, _Req2} = cowboy_req:meta(<<"clientId">>, Req),
+  {AccountId, _Req1} = cowboy_req:meta(<<"accountId">>, Req),
+  lager:log(info, self(), "Client ~s adding new transaction to account ~s~n", [uuid:uuid_to_string(ClientId), AccountId]),
+  {ok, Body, _} = cowboy_req:body(Req),
+  try
+    {Data} = jiffy:decode(Body),
+    Valid = proplists:is_defined(<<"description">>, Data) and proplists:is_defined(<<"category">>, Data) and proplists:is_defined(<<"subCategory">>, Data) and proplists:is_defined(<<"amount">>, Data) and proplists:is_defined(<<"timestamp">>, Data) and proplists:is_defined(<<"tags">>, Data),
+    case Valid of
+      true ->
+        Description = proplists:get_value(<<"description">>, Data),
+        Category = binary_to_list(proplists:get_value(<<"category">>, Data)),
+        SubCategory = binary_to_list(proplists:get_value(<<"subCategory">>, Data)),
+        Amount = proplists:get_value(<<"amount">>, Data),
+        Timestamp = proplists:get_value(<<"timestamp">>, Data),
+        Tags = proplists:get_value(<<"tags">>, Data),
+        TagsList = string:tokens(binary_to_list(Tags), ","),
+        Result = expenses_library:add_transaction(AccountId, Description, Category, SubCategory, Amount, Timestamp, TagsList),
+        case Result of
+          {ok, TransactionId} ->
+            Output = {[{<<"id">>, TransactionId}]},
+            JSON = jiffy:encode(Output),
+            Resp = cowboy_req:set_resp_body(JSON, Req),
+            {true, Resp, State};
+          system_error ->
+            lager:log(info, self(), "Client ~s problem when adding transaction~n", [uuid:uuid_to_string(ClientId)]),
+            {false, Req, State}
+        end;
+      false ->
+        lager:log(info, self(), "Client ~s missing parameter for new transaction~n", [uuid:uuid_to_string(ClientId)]),
+        {false, Req, State}
+    end
+  catch
+    throw:{error, _} ->
+      lager:log(info, self(), "Client ~s sending bad request for new transaction~n", [uuid:uuid_to_string(ClientId)]),
+      {false, Req, State};
+    error:_ ->
+      lager:log(info, self(), "Client ~s sending invalid data for new transaction~n", [uuid:uuid_to_string(ClientId)]),
+      {false, Req, State}
+  end.
