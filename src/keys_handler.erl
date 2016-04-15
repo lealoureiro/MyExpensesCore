@@ -76,7 +76,9 @@ process_post(Req, State) ->
         {true, Resp, State}
     end
   catch
-    throw:{error, _} -> cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], Req1)
+    throw:{error, _} ->
+      lager:log(info, self(), "Problem parsing the request!"),
+      {false, Req, State}
   end.
 
 
