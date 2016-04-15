@@ -13,7 +13,6 @@ start(_Type, _Args) ->
   startDatabase(),
   Dispatch = cowboy_router:compile([
     {'_', [
-      {"/expenses/[...]", expenses_handler, []},
       {"/keys/", keys_handler, []},
       {"/accounts/[:id]", accounts_handler, []},
       {"/accounts/:accountId/transactions/", transactions_handler, []}
