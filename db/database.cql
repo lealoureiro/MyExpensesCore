@@ -73,3 +73,7 @@ CREATE TABLE transactions_by_tag (
     PRIMARY KEY (tag,transaction_id)
 );
 
+CREATE TABLE transactions_by_external (
+	external_reference text PRIMARY KEY,
+	transaction_id uuid
+);
