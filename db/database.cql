@@ -19,7 +19,7 @@ CREATE TABLE accounts (
     account_id uuid PRIMARY KEY,
     name varchar,
     account_type text,
-    start_balance double,
+    start_balance bigint,
     currency varchar,
     user_id uuid,
 );
@@ -42,7 +42,7 @@ CREATE TABLE transactions (
     category text,
     sub_category text,
     date timestamp,
-    amount double,
+    amount bigint,
     external_reference text,
     PRIMARY KEY (account_id, date, transaction_id, amount)
 )
