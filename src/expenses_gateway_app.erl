@@ -14,7 +14,8 @@ start(_Type, _Args) ->
   Dispatch = cowboy_router:compile([
     {'_', [
       {"/keys/", keys_handler, []},
-      {"/accounts/[:id]", accounts_handler, []},
+      {"/accounts/", accounts_handler, []},
+      {"/accounts/:id", account_detail_handler, []},
       {"/accounts/:accountId/transactions/", transactions_handler, []}
     ]}
   ]),
