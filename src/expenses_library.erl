@@ -9,10 +9,9 @@
 -module(expenses_library).
 -author("leandroloureiro").
 
-
 -include_lib("cqerl/include/cqerl.hrl").
 
--export([get_all_categories/0]).
+-export([get_all_categories/1]).
 -export([get_all_subcategories/0]).
 -export([add_transaction/7]).
 -export([check_account_auth/2]).
@@ -116,10 +115,10 @@ get_account_transactions_balance(AccountId) ->
   end.
 
 
-get_all_categories() ->
+get_all_categories(ClientId) ->
   case cqerl:new_client() of
     {ok, Client} ->
-      case cqerl:run_query(Client, "SELECT name FROM category") of
+      case cqerl:run_query(Client, #cql_query{statement = "SELECT name FROM category WHERE user_id = ?", values = [{user_id, ClientId}]}) of
         {ok, Result} ->
           cqerl:close_client(Client),
           lists:sort(cqerl:all_rows(Result));

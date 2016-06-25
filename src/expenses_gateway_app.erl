@@ -16,7 +16,8 @@ start(_Type, _Args) ->
       {"/keys/", keys_handler, []},
       {"/accounts/", accounts_handler, []},
       {"/accounts/:id", account_detail_handler, []},
-      {"/accounts/:accountId/transactions/", transactions_handler, []}
+      {"/accounts/:accountId/transactions/", transactions_handler, []},
+      {"/categories/", categories_handler, []}
     ]}
   ]),
   lager:log(info, self(), "Starting HTTP Server... ~n"),
