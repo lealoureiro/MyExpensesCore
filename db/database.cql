@@ -52,13 +52,16 @@ CREATE INDEX search_by_category ON transactions (category);
 CREATE INDEX search_by_sub_category ON transactions (sub_category);
 
 CREATE TABLE category (
-    name text PRIMARY KEY 
+    user_id uuid,
+    name text,
+    PRIMARY KEY (user_id, name)
 );
 
 CREATE TABLE sub_category (
+    user_id uuid,
     category_name text,
     name text,
-    PRIMARY KEY (category_name, name)
+    PRIMARY KEY (user_id, category_name, name)
 );
 
 CREATE TABLE tags_by_transaction (
