@@ -15,6 +15,8 @@
 -export([is_authorized/2]).
 -export([content_types_provided/2]).
 -export([get_json/2]).
+-export([prepare_category_dictionary/2]).
+-export([fill_sub_categories/2]).
 
 
 init(_Transport, _Req, []) ->
@@ -51,12 +53,36 @@ get_json(Req, State) ->
       {<<"[]">>, Req, State};
     [_ | _] ->
       Map = fun(Category) -> proplists:get_value(name, Category) end,
-      Data = lists:map(Map, Categories),
-      JSON = jiffy:encode(Data),
-      {JSON, Req, State};
+      CategoryList = lists:map(Map, Categories),
+      InitialData = prepare_category_dictionary(CategoryList, dict:new()),
+      SubCategories = expenses_library:get_all_subcategories(ClientId),
+      case SubCategories of
+        [] ->
+          JSON = jiffy:encode({InitialData}),
+          {JSON, Req, State};
+        [_ | _] ->
+          Result = dict:to_list(fill_sub_categories(SubCategories, InitialData)),
+          JSON = jiffy:encode({Result}),
+          {JSON, Req, State};
+        _ ->
+          {false, Req, State}
+      end;
     _ ->
       lager:log(error, self(), "A problem occurred when fetching categories for user ~s", [uuid:uuid_to_string(ClientId)]),
       {false, Req, State}
   end.
 
+prepare_category_dictionary([], Dict) ->
+  Dict;
 
+prepare_category_dictionary([H | T], D) ->
+  prepare_category_dictionary(T, dict:store(H, [], D)).
+
+fill_sub_categories([], Dict) ->
+  Dict;
+
+fill_sub_categories([SubCategory | T], Dict) ->
+  Category = proplists:get_value(category_name, SubCategory),
+  SubCategoryName = proplists:get_value(name, SubCategory),
+  SubCategoryList = dict:fetch(Category, Dict),
+  fill_sub_categories(T, dict:store(Category, [SubCategoryName] ++ SubCategoryList, Dict)).

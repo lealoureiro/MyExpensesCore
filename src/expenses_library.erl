@@ -12,7 +12,7 @@
 -include_lib("cqerl/include/cqerl.hrl").
 
 -export([get_all_categories/1]).
--export([get_all_subcategories/0]).
+-export([get_all_subcategories/1]).
 -export([add_transaction/7]).
 -export([check_account_auth/2]).
 -export([get_client_accounts/1]).
@@ -131,10 +131,10 @@ get_all_categories(ClientId) ->
   end.
 
 
-get_all_subcategories() ->
+get_all_subcategories(ClientId) ->
   case cqerl:new_client() of
     {ok, Client} ->
-      case cqerl:run_query(Client, "SELECT category_name,name FROM sub_category") of
+      case cqerl:run_query(Client, #cql_query{statement = "SELECT category_name,name FROM sub_category WHERE user_id = ? ", values = [{user_id, ClientId}]}) of
         {ok, Result} ->
           cqerl:close_client(Client),
           lists:sort(cqerl:all_rows(Result));
