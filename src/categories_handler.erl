@@ -82,7 +82,14 @@ fill_sub_categories([], Dict) ->
   Dict;
 
 fill_sub_categories([SubCategory | T], Dict) ->
+
   Category = proplists:get_value(category_name, SubCategory),
   SubCategoryName = proplists:get_value(name, SubCategory),
-  SubCategoryList = dict:fetch(Category, Dict),
-  fill_sub_categories(T, dict:store(Category, [SubCategoryName] ++ SubCategoryList, Dict)).
+  try
+    SubCategoryList = dict:fetch(Category, Dict),
+    fill_sub_categories(T, dict:store(Category, [SubCategoryName] ++ SubCategoryList, Dict))
+  catch
+    error:badarg ->
+      lager:log(warning, self(), "Category ~s not found for sub category ~s!", [Category, SubCategoryName]),
+      fill_sub_categories(T, Dict)
+  end.
