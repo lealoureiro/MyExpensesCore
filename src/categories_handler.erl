@@ -22,7 +22,6 @@
 init(_Transport, _Req, []) ->
   {upgrade, protocol, cowboy_rest}.
 
-
 allowed_methods(Req, State) ->
   {[<<"POST">>, <<"GET">>, <<"OPTIONS">>], Req, State}.
 

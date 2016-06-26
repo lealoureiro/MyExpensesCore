@@ -22,6 +22,7 @@
 -export([get_account_transactions/1]).
 -export([add_category/2]).
 -export([add_sub_category/3]).
+-export([verify_category/2]).
 
 
 get_account_transactions(AccountId) ->
@@ -163,7 +164,7 @@ get_all_subcategories(ClientId) ->
       system_error
   end.
 
-add_sub_category(ClientId, Category, SubCategory) ->
+verify_category(ClientId, Category) ->
   case cqerl:new_client() of
     {ok, Client} ->
       Result = cqerl:run_query(Client, #cql_query{statement = "SELECT name FROM category WHERE user_id = ? AND name = ? ",
@@ -171,24 +172,30 @@ add_sub_category(ClientId, Category, SubCategory) ->
       case Result of
         {ok, Data} ->
           Categories = cqerl:all_rows(Data),
+          cqerl:close_client(Client),
           case Categories of
             [] ->
-              cqerl:close_client(Client),
-              not_allowed;
+              false;
             [_] ->
-              Result2 = cqerl:run_query(Client, #cql_query{statement = <<"INSERT INTO sub_category (user_id, category_name, name) VALUES (?,?,?)">>,
-                values = [{user_id, ClientId}, {category_name, Category}, {name, SubCategory}]}),
-              cqerl:close_client(Client),
-              case Result2 of
-                {ok, void} ->
-                  true;
-                _ ->
-                  false
-              end
-          end;
+              true
+          end
+      end;
+    _ ->
+      system_error
+  end.
+
+add_sub_category(ClientId, Category, SubCategory) ->
+  case cqerl:new_client() of
+    {ok, Client} ->
+      Result = cqerl:run_query(Client, #cql_query{statement = <<"INSERT INTO sub_category (user_id, category_name, name) VALUES (?,?,?)">>,
+        values = [{user_id, ClientId}, {category_name, Category}, {name, SubCategory}]}),
+      cqerl:close_client(Client),
+      case Result of
+        {ok, void} ->
+          true;
         _ ->
-          cqerl:close_client(Client),
-          system_error
+          false
+
       end;
     _ ->
       system_error

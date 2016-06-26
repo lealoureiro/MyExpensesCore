@@ -7,7 +7,6 @@
 -export([stop/1]).
 
 
-
 start(_Type, _Args) ->
   lager:log(info, self(), "Initializing MNESIA database... ~n"),
   startDatabase(),
@@ -17,7 +16,8 @@ start(_Type, _Args) ->
       {"/accounts/", accounts_handler, []},
       {"/accounts/:id", account_detail_handler, []},
       {"/accounts/:accountId/transactions/", transactions_handler, []},
-      {"/categories/", categories_handler, []}
+      {"/categories/", categories_handler, []},
+      {"/categories/:categoryName", sub_categories_handler, []}
     ]}
   ]),
   lager:log(info, self(), "Starting HTTP Server... ~n"),
