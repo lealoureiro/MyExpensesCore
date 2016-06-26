@@ -46,7 +46,7 @@ is_authorized(Req, State) ->
 
 get_json(Req, State) ->
   {ClientId, _} = cowboy_req:meta(<<"clientId">>, Req),
-  lager:log(info, self(), "Client ~s requested gategories ~n", [uuid:uuid_to_string(ClientId)]),
+  lager:log(info, self(), "Client ~s requested categories ~n", [uuid:uuid_to_string(ClientId)]),
   Categories = expenses_library:get_all_categories(ClientId),
   case Categories of
     [] ->
