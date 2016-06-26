@@ -14,9 +14,9 @@
 -export([allowed_methods/2]).
 -export([is_authorized/2]).
 -export([content_types_provided/2]).
+-export([content_types_accepted/2]).
 -export([get_json/2]).
--export([prepare_category_dictionary/2]).
--export([fill_sub_categories/2]).
+-export([process_post/2]).
 
 
 init(_Transport, _Req, []) ->
@@ -28,6 +28,9 @@ allowed_methods(Req, State) ->
 
 content_types_provided(Req, State) ->
   {[{<<"application/json">>, get_json}], Req, State}.
+
+content_types_accepted(Req, State) ->
+  {[{<<"application/json">>, process_post}], Req, State}.
 
 is_authorized(Req, State) ->
   case cowboy_req:header(<<"authkey">>, Req) of
@@ -92,4 +95,24 @@ fill_sub_categories([SubCategory | T], Dict) ->
     error:badarg ->
       lager:log(warning, self(), "Category ~s not found for sub category ~s!", [Category, SubCategoryName]),
       fill_sub_categories(T, Dict)
+  end.
+
+process_post(Req, State) ->
+  {ClientId, _} = cowboy_req:meta(<<"clientId">>, Req),
+  {ok, Body, _} = cowboy_req:body(Req),
+  {Data} = jiffy:decode(Body),
+  Valid = proplists:is_defined(<<"name">>, Data),
+  case Valid of
+    true ->
+      Name = proplists:get_value(<<"name">>, Data),
+      lager:log(info, self(), "Client ~s adding new category ~s~n", [uuid:uuid_to_string(ClientId), Name]),
+      case expenses_library:add_category(ClientId, Name) of
+        true ->
+          {true, Req, State};
+        _ ->
+          {false, Req, State}
+      end;
+    _ ->
+      lager:log(info, self(), "Client ~s missing parameter for new category~n", [uuid:uuid_to_string(ClientId)]),
+      {false, Req, State}
   end.

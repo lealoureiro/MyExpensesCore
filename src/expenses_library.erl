@@ -20,6 +20,7 @@
 -export([get_account_info/1]).
 -export([get_account_transactions_balance/1]).
 -export([get_account_transactions/1]).
+-export([add_category/2]).
 
 
 get_account_transactions(AccountId) ->
@@ -130,6 +131,19 @@ get_all_categories(ClientId) ->
       system_error
   end.
 
+add_category(ClientId, Category) ->
+  case cqerl:new_client() of
+    {ok, Client} ->
+      case cqerl:run_query(Client, #cql_query{statement = "INSERT INTO category (user_id,name) VALUES (?,?)",
+        values = [{user_id, ClientId}, {name, Category}]}) of
+        {ok, void} ->
+          true;
+        _ ->
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
 
 get_all_subcategories(ClientId) ->
   case cqerl:new_client() of
