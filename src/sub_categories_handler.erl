@@ -12,7 +12,11 @@
 %% API
 -export([init/3]).
 -export([allowed_methods/2]).
+-export([allow_missing_post/2]).
 -export([is_authorized/2]).
+-export([resource_exists/2]).
+-export([content_types_accepted/2]).
+-export([process_post/2]).
 
 
 init(_Transport, _Req, []) ->
@@ -20,6 +24,12 @@ init(_Transport, _Req, []) ->
 
 allowed_methods(Req, State) ->
   {[<<"POST">>, <<"OPTIONS">>], Req, State}.
+
+allow_missing_post(Req, State) ->
+  {false, Req, State}.
+
+content_types_accepted(Req, State) ->
+  {[{<<"application/json">>, process_post}], Req, State}.
 
 is_authorized(Req, State) ->
   case cowboy_req:header(<<"authkey">>, Req) of
@@ -36,4 +46,32 @@ is_authorized(Req, State) ->
         not_valid ->
           {{false, <<"Key">>}, Req, State}
       end
+  end.
+
+resource_exists(Req, State) ->
+  {ClientId, _} = cowboy_req:meta(<<"clientId">>, Req),
+  {Category, _} = cowboy_req:meta(<<"category">>, Req),
+  lager:log(info, self(), "Client ~s accessing category ~s", [uuid:uuid_to_string(ClientId), Category]),
+  Result = expenses_library:verify_category(ClientId, Category),
+  {Result, Req, State}.
+
+process_post(Req, State) ->
+  {ClientId, _Req2} = cowboy_req:meta(<<"clientId">>, Req),
+  {Category, _Req1} = cowboy_req:meta(<<"category">>, Req),
+  {ok, Body, _} = cowboy_req:body(Req),
+  {Data} = jiffy:decode(Body),
+  Valid = proplists:is_defined(<<"name">>, Data),
+  case Valid of
+    true ->
+      Name = proplists:get_value(<<"name">>, Data),
+      lager:log(info, self(), "Client ~s adding new sub category ~s to category ~s", [uuid:uuid_to_string(ClientId), Name, Category]),
+      case expenses_library:add_sub_category(ClientId, Category, Name) of
+        true ->
+          {true, Req, State};
+        _ ->
+          {false, Req, State}
+      end;
+    _ ->
+      lager:log(info, self(), "Client ~s missing parameter for new sub category~n", [uuid:uuid_to_string(ClientId)]),
+      {false, Req, State}
   end.
