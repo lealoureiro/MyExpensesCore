@@ -17,6 +17,7 @@ start(_Type, _Args) ->
       {"/accounts/:id", account_detail_handler, []},
       {"/accounts/:accountId/transactions/", transactions_handler, []},
       {"/categories/", categories_handler, []},
+      {"/categories/:categoryName", category_handler, []},
       {"/categories/:categoryName/subcategories/", sub_categories_handler, []}
     ]}
   ]),

@@ -23,6 +23,7 @@
 -export([add_category/2]).
 -export([add_sub_category/3]).
 -export([verify_category/2]).
+-export([delete_category/2]).
 
 
 get_account_transactions(AccountId) ->
@@ -201,6 +202,29 @@ add_sub_category(ClientId, Category, SubCategory) ->
       system_error
   end.
 
+delete_category(ClientId, Category) ->
+  case cqerl:new_client() of
+    {ok, Client} ->
+      Result = cqerl:run_query(Client, #cql_query{statement = <<"DELETE FROM sub_category WHERE user_id = ? AND category_name = ?">>,
+        values = [{user_id, ClientId}, {category_name, Category}]}),
+      case Result of
+        {ok, void} ->
+          Result2 = cqerl:run_query(Client, #cql_query{statement = <<"DELETE FROM category WHERE user_id = ? AND name = ?">>,
+            values = [{user_id, ClientId}, {name, Category}]}),
+          cqerl:close_client(Client),
+          case Result2 of
+            {ok, void} ->
+              true;
+            _ ->
+              false
+          end;
+        _ ->
+          cqerl:close_client(Client),
+          false
+      end;
+    _ ->
+      system_error
+  end.
 
 add_transaction(AccountId, Description, Category, SubCategory, Amount, Timestamp, Tags) ->
   AccountIdUUID = uuid:string_to_uuid(AccountId),
