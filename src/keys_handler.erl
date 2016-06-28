@@ -22,17 +22,14 @@
 init(_Transport, _Req, []) ->
   {upgrade, protocol, cowboy_rest}.
 
-
 allowed_methods(Req, State) ->
   {[<<"POST">>, <<"GET">>, <<"DELETE">>, <<"OPTIONS">>], Req, State}.
-
 
 content_types_provided(Req, State) ->
   {[{<<"application/json">>, get_json}], Req, State}.
 
 content_types_accepted(Req, State) ->
   {[{<<"application/json">>, process_post}], Req, State}.
-
 
 get_json(Req, State) ->
   lager:log(info, self(), "Requested Key information ~n"),
@@ -42,6 +39,7 @@ get_json(Req, State) ->
       cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], Req),
       {halt, Req, State};
     {Token, _} ->
+      lager:log(info, self(), "Client getting information for key ~s", [Token]),
       case auth_library:auth(Token) of
         {ok, ClientId} ->
           Output = {[{<<"clientId">>, list_to_binary(uuid:uuid_to_string(ClientId))}]},
@@ -80,7 +78,6 @@ process_post(Req, State) ->
       lager:log(info, self(), "Problem parsing the request!"),
       {false, Req, State}
   end.
-
 
 delete_resource(Req, State) ->
   lager:log(info, self(), "Requested delete Key ~n"),

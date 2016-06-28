@@ -13,7 +13,13 @@
 -include_lib("cqerl/include/cqerl.hrl").
 
 %% API
--export([login/2, auth/1, logout/1, get_user_id/1, get_user_data/1, show_sessions/0, generate_token/2]).
+-export([login/2]).
+-export([auth/1]).
+-export([logout/1]).
+-export([get_user_id/1]).
+-export([get_user_data/1]).
+-export([show_sessions/0]).
+-export([generate_token/1]).
 
 login(Username, Password) when is_list(Username) ->
   login(list_to_binary(Username), Password);
@@ -27,7 +33,7 @@ login(Username, Password) ->
         {ok, Username, HashPasswordString, Name} ->
           case createSession(UserId) of
             {ok, Token} ->
-              {list_to_binary(Token), list_to_binary(uuid:uuid_to_string(UserId)), Name};
+              {Token, list_to_binary(uuid:uuid_to_string(UserId)), Name};
             _ ->
               error
           end;
@@ -93,7 +99,7 @@ get_user_data(UserId) ->
 
 
 createSession(ClientId) ->
-  Token = generate_token("", 0),
+  Token = generate_token(32),
   Timestamp = unixTimeStamp(),
   End = Timestamp + 300,
   Fun = fun() ->
@@ -107,20 +113,15 @@ createSession(ClientId) ->
       error
   end.
 
-generate_token(Token, 128) ->
-  Token;
 
-generate_token(TokenPart, _) ->
-  TokenBytes = crypto:strong_rand_bytes(64),
-  TokenString = base64:encode(TokenBytes),
-  TokenFiltered = re:replace(TokenString, "[^A-Za-z0-1]", "", [global, {return, list}]),
-  NewToken = string:substr(string:concat(TokenPart, TokenFiltered), 1, 128),
-  generate_token(NewToken, string:len(NewToken)).
-
-auth(Token) when is_binary(Token) ->
-  auth(binary_to_list(Token));
+generate_token(Size) ->
+  TokenBytes = crypto:strong_rand_bytes(Size),
+  base64:encode(TokenBytes).
 
 auth(Token) when is_list(Token) ->
+  auth(list_to_binary(Token));
+
+auth(Token) when is_binary(Token) ->
   CheckTokenFun = fun() ->
     [Session] = mnesia:read(sessions, Token, read),
     case Session#sessions.valid of
