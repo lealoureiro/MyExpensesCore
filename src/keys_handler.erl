@@ -87,7 +87,7 @@ delete_resource(Req, State) ->
       cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], Req),
       {halt, Req, State};
     {Key, _} ->
-      case auth_library:logout(binary_to_list(Key)) of
+      case auth_library:logout(Key) of
         ok ->
           {true, Req, State};
         not_valid ->
