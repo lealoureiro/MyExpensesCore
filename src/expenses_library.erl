@@ -24,6 +24,8 @@
 -export([add_sub_category/3]).
 -export([verify_category/2]).
 -export([delete_category/2]).
+-export([delete_sub_category/3]).
+-export([verify_sub_category/3]).
 
 
 get_account_transactions(AccountId) ->
@@ -185,6 +187,26 @@ verify_category(ClientId, Category) ->
       system_error
   end.
 
+verify_sub_category(ClientId, Category, SubCategory) ->
+  case cqerl:new_client() of
+    {ok, Client} ->
+      Result = cqerl:run_query(Client, #cql_query{statement = "SELECT name FROM sub_category WHERE user_id = ? AND category_name = ? AND name = ?",
+        values = [{user_id, ClientId}, {category_name, Category}, {name, SubCategory}]}),
+      case Result of
+        {ok, Data} ->
+          Categories = cqerl:all_rows(Data),
+          cqerl:close_client(Client),
+          case Categories of
+            [] ->
+              false;
+            [_] ->
+              true
+          end
+      end;
+    _ ->
+      system_error
+  end.
+
 add_sub_category(ClientId, Category, SubCategory) ->
   case cqerl:new_client() of
     {ok, Client} ->
@@ -220,6 +242,22 @@ delete_category(ClientId, Category) ->
           end;
         _ ->
           cqerl:close_client(Client),
+          false
+      end;
+    _ ->
+      system_error
+  end.
+
+delete_sub_category(ClientId, Category, SubCategory) ->
+  case cqerl:new_client() of
+    {ok, Client} ->
+      Result = cqerl:run_query(Client, #cql_query{statement = <<"DELETE FROM sub_category WHERE user_id = ? AND category_name = ? AND name = ?">>,
+        values = [{user_id, ClientId}, {category_name, Category}, {name, SubCategory}]}),
+      cqerl:close_client(Client),
+      case Result of
+        {ok, void} ->
+          true;
+        _ ->
           false
       end;
     _ ->
