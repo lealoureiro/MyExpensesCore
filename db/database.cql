@@ -44,7 +44,7 @@ CREATE TABLE transactions (
     date timestamp,
     amount bigint,
     external_reference text,
-    PRIMARY KEY ((account_id, transaction_id), date)
+    PRIMARY KEY (account_id, transaction_id, date)
 ) WITH CLUSTERING ORDER BY (date DESC);
 
 CREATE INDEX search_by_category ON transactions (category);
