@@ -19,9 +19,6 @@
 -export([process_post/2]).
 
 
--export([prepare_category_dictionary/2]).
-
-
 init(_Transport, _Req, []) ->
   {upgrade, protocol, cowboy_rest}.
 
