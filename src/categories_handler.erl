@@ -19,6 +19,9 @@
 -export([process_post/2]).
 
 
+-export([prepare_category_dictionary/2]).
+
+
 init(_Transport, _Req, []) ->
   {upgrade, protocol, cowboy_rest}.
 
@@ -60,7 +63,9 @@ get_json(Req, State) ->
       SubCategories = expenses_library:get_all_subcategories(ClientId),
       case SubCategories of
         [] ->
-          JSON = jiffy:encode({InitialData}),
+          Result = fill_sub_categories(SubCategories, InitialData),
+          Result2 = final_output_mapper(dict:fetch_keys(Result), Result),
+          JSON = jiffy:encode(Result2),
           {JSON, Req, State};
         [_ | _] ->
           Result = fill_sub_categories(SubCategories, InitialData),
