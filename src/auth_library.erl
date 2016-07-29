@@ -47,12 +47,11 @@ login(Username, Password) ->
   end.
 
 get_user_id(Username) ->
-  case cqerl:new_client() of
+  case cqerl:get_client({}) of
     {ok, Client} ->
       case cqerl:run_query(Client, #cql_query{statement = <<"SELECT user_id FROM users_by_username WHERE username = ?;">>, values = [{username, Username}]}) of
         {ok, Result} ->
           Row = cqerl:head(Result),
-          cqerl:close_client(Client),
           case Row of
             empty_dataset ->
               not_found;
@@ -61,7 +60,6 @@ get_user_id(Username) ->
               {ok, UserId}
           end;
         _ ->
-          cqerl:close_client(Client),
           error
       end;
     _ ->
@@ -71,7 +69,7 @@ get_user_id(Username) ->
 get_user_data(UserId) ->
   case uuid:is_uuid(UserId) of
     true ->
-      case cqerl:new_client() of
+      case cqerl:get_client({}) of
         {ok, Client} ->
           case cqerl:run_query(Client, #cql_query{statement = <<"SELECT username,password,name FROM users WHERE user_id = ?;">>, values = [{user_id, UserId}]}) of
             {ok, Result} ->
@@ -80,14 +78,12 @@ get_user_data(UserId) ->
                 empty_dataset ->
                   not_found;
                 _ ->
-                  cqerl:close_client(Client),
                   Username = proplists:get_value(username, Row),
                   Password = proplists:get_value(password, Row),
                   Name = proplists:get_value(name, Row),
                   {ok, Username, Password, Name}
               end;
             _ ->
-              cqerl:close_client(Client),
               error
           end;
         _ ->
