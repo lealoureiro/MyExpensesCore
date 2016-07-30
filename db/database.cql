@@ -47,6 +47,18 @@ CREATE TABLE transactions (
     PRIMARY KEY (account_id, date, transaction_id, amount)
 ) WITH CLUSTERING ORDER BY (date DESC);
 
+CREATE TABLE tags_by_transaction (
+      transaction_id uuid,
+      tag text,
+      PRIMARY KEY (transaction_id, tag)
+);
+
+CREATE TABLE transactions_by_tag (
+    tag text,
+    transaction_id uuid,
+    PRIMARY KEY (tag,transaction_id)
+);
+
 CREATE INDEX search_by_category ON transactions (category);
 CREATE INDEX search_by_sub_category ON transactions (sub_category);
 
@@ -61,18 +73,6 @@ CREATE TABLE sub_category (
     category_name text,
     name text,
     PRIMARY KEY (user_id, category_name, name)
-);
-
-CREATE TABLE tags_by_transaction (
-      transaction_id uuid,
-      tag text,
-      PRIMARY KEY (transaction_id, tag)
-);
-
-CREATE TABLE transactions_by_tag (
-    tag text,
-    transaction_id uuid,
-    PRIMARY KEY (tag,transaction_id)
 );
 
 CREATE TABLE transactions_by_external (
