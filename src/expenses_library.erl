@@ -23,6 +23,7 @@
 
   add_transaction/7,
   delete_transaction/3,
+  verify_transaction/3,
 
   check_account_auth/2,
   get_client_accounts/1,
@@ -315,6 +316,30 @@ add_tag_to_transaction(TransactionId, Tag) when is_list(Tag) ->
     _ ->
       system_error
   end.
+
+
+verify_transaction(AccountId, TransactionId, Timestamp) ->
+  case cqerl:get_client({}) of
+    {ok, Client} ->
+      Result = cqerl:run_query(Client, #cql_query{statement = "SELECT description FROM transactions WHERE account_id = ? AND date = ? AND transaction_id = ?",
+        values = [{account_id, AccountId}, {date, Timestamp}, {transaction_id, TransactionId}]}),
+      case Result of
+        {ok, Data} ->
+          Categories = cqerl:all_rows(Data),
+          case Categories of
+            [] ->
+              false;
+            [_] ->
+              true
+          end;
+        {error, _} ->
+          lager:log(error, self(), "Error occured when checking transaction ~s", [TransactionId]),
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
+
 
 delete_transaction(AccountId, TransactionId, Timestamp) ->
   case cqerl:get_client({}) of
