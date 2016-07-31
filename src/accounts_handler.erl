@@ -72,7 +72,9 @@ get_json(Req, State) ->
     [] ->
       {<<"[]">>, Req, State};
     _ ->
-      {false, Req, State}
+      lager:log(error, self(), "Failed to fetch accounts for user ~s", [uuid:uuid_to_string(ClientId)]),
+      cowboy_req:reply(500, Req),
+      {halt, Req, State}
   end.
 
 

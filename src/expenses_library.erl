@@ -42,7 +42,8 @@ get_account_transactions(AccountId) ->
         case cqerl:run_query(Client, #cql_query{statement = <<"SELECT transaction_id,date,description,amount,category,sub_category,external_reference FROM transactions WHERE account_id = ?;">>, values = [{account_id, AccountIdUUID}]}) of
           {ok, Result} ->
             cqerl:all_rows(Result);
-          _ ->
+          {error, {Code, Description, _}} ->
+            lager:log(error, self(), "Problem when fetching transactions for account ~s: ~B - ~s", [AccountId, Code, Description]),
             system_error
         end;
       _ ->
@@ -64,7 +65,8 @@ get_client_accounts(ClientId) ->
               GetAccountIds = fun(Account) -> uuid:uuid_to_string(proplists:get_value(account_id, Account)) end,
               get_client_accounts_information(lists:map(GetAccountIds, Accounts))
           end;
-        _ ->
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem when fetching accounts for user ~s: ~B - ~s", [uuid:uuid_to_string(ClientId), Code, Description]),
           system_error
       end;
     _ ->
@@ -78,7 +80,8 @@ get_client_accounts_information(AccountIds) ->
       case cqerl:run_query(Client, #cql_query{statement = <<"SELECT * FROM accounts WHERE account_id IN ", AccountsINClause/binary>>}) of
         {ok, Result} ->
           cqerl:all_rows(Result);
-        _ ->
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem when fetching account information for accounts ~s: ~B - ~s", [AccountsINClause, Code, Description]),
           system_error
       end;
     _ ->
@@ -98,7 +101,8 @@ get_account_info(AccountId) ->
       case cqerl:run_query(Client, #cql_query{statement = <<"SELECT account_id, account_type,currency,name,start_balance FROM accounts WHERE account_id = ?">>, values = [{account_id, AccountId}]}) of
         {ok, Result} ->
           cqerl:head(Result);
-        _ ->
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem when getting account information for account ~s: ~B - ~s", [AccountId, Code, Description]),
           system_error
       end;
     _ ->
@@ -112,7 +116,8 @@ get_account_transactions_balance(AccountId) ->
       case cqerl:run_query(Client, #cql_query{statement = <<"select count(*) as transactions, sum(amount) as balance from transactions WHERE account_id = ?">>, values = [{account_id, AccountId}]}) of
         {ok, Result} ->
           cqerl:head(Result);
-        _ ->
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem getting transactions balance for account ~s: ~B - ~s", [AccountId, Code, Description]),
           system_error
       end;
     _ ->
@@ -126,7 +131,8 @@ get_all_categories(ClientId) ->
       case cqerl:run_query(Client, #cql_query{statement = "SELECT name FROM category WHERE user_id = ?", values = [{user_id, ClientId}]}) of
         {ok, Result} ->
           lists:sort(cqerl:all_rows(Result));
-        _ ->
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem getting categories for user ~s: ~B - ~s", [uuid:uuid_to_string(ClientId), Code, Description]),
           system_error
       end;
     _ ->
@@ -140,7 +146,8 @@ add_category(ClientId, Category) ->
         values = [{user_id, ClientId}, {name, Category}]}) of
         {ok, void} ->
           true;
-        _ ->
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem adding new category ~s for user ~s: ~B - ~s", [Category, uuid:uuid_to_string(ClientId), Code, Description]),
           system_error
       end;
     _ ->
@@ -153,7 +160,8 @@ get_all_subcategories(ClientId) ->
       case cqerl:run_query(Client, #cql_query{statement = "SELECT category_name,name FROM sub_category WHERE user_id = ? ", values = [{user_id, ClientId}]}) of
         {ok, Result} ->
           lists:sort(cqerl:all_rows(Result));
-        _ ->
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem fetching all sub categories for user ~s: ~B - ~s", [uuid:uuid_to_string(ClientId), Code, Description]),
           system_error
       end;
     _ ->
@@ -173,7 +181,10 @@ verify_category(ClientId, Category) ->
               false;
             [_] ->
               true
-          end
+          end;
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem fetching category ~s for user ~s: ~B - ~s", [Category, uuid:uuid_to_string(ClientId), Code, Description]),
+          system_error
       end;
     _ ->
       system_error
@@ -192,7 +203,10 @@ verify_sub_category(ClientId, Category, SubCategory) ->
               false;
             [_] ->
               true
-          end
+          end;
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem fetching category ~s for user ~s - ~s: ~B - ~s", [Category, SubCategory, uuid:uuid_to_string(ClientId), Code, Description]),
+          system_error
       end;
     _ ->
       system_error
@@ -206,9 +220,9 @@ add_sub_category(ClientId, Category, SubCategory) ->
       case Result of
         {ok, void} ->
           true;
-        _ ->
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem adding sub category ~s to category ~s for user ~s: ~B - ~s", [SubCategory, Category, uuid:uuid_to_string(ClientId), Code, Description]),
           false
-
       end;
     _ ->
       system_error
@@ -226,10 +240,12 @@ delete_category(ClientId, Category) ->
           case Result2 of
             {ok, void} ->
               true;
-            _ ->
+            {error, {Code, Description, _}} ->
+              lager:log(error, self(), "Problem deleting category ~s for user ~s: ~B - ~s", [Category, uuid:uuid_to_string(ClientId), Code, Description]),
               false
           end;
-        _ ->
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem deleting sub categories from category ~s for user ~s: ~B - ~s", [Category, uuid:uuid_to_string(ClientId), Code, Description]),
           false
       end;
     _ ->
@@ -244,7 +260,8 @@ delete_sub_category(ClientId, Category, SubCategory) ->
       case Result of
         {ok, void} ->
           true;
-        _ ->
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem deleting sub category ~s from category ~s for user ~s: ~B - ~s", [SubCategory, Category, uuid:uuid_to_string(ClientId), Code, Description]),
           false
       end;
     _ ->
@@ -281,7 +298,8 @@ add_transaction(AccountId, Description, Category, SubCategory, Amount, Timestamp
             _ ->
               system_error
           end;
-        _ ->
+        {error, {Code, ErrorDescription, _}} ->
+          lager:log(error, self(), "Failed to add transaction [~s] to account ~s: ~B - ~s", [Description, AccountId, Code, ErrorDescription]),
           system_error
       end;
     _ ->
@@ -307,10 +325,12 @@ add_tag_to_transaction(TransactionId, Tag) when is_list(Tag) ->
           case Result2 of
             {ok, void} ->
               ok;
-            _ ->
+            {error, {Code, Description, _}} ->
+              lager:log(error, self(), "Failed to add transaction [~s] to tag [~s]: ~B - ~s", [TransactionId, Tag, Code, Description]),
               system_error
           end;
-        _ ->
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Failed to add tag [~s] to transaction [~s]: ~B - ~s", [Tag, TransactionId, Code, Description]),
           system_error
       end;
     _ ->
@@ -332,8 +352,8 @@ verify_transaction(AccountId, TransactionId, Timestamp) ->
             [_] ->
               true
           end;
-        {error, _} ->
-          lager:log(error, self(), "Error occured when checking transaction ~s", [TransactionId]),
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Error occured when checking transaction ~s: ~B - ~s", [TransactionId, Code, Description]),
           system_error
       end;
     _ ->
@@ -349,8 +369,8 @@ delete_transaction(AccountId, TransactionId, Timestamp) ->
       case Result of
         {ok, void} ->
           delete_transaction_tags(TransactionId);
-        {error, _} ->
-          lager:log(error, self(), "Error occured when deleting transaction ~s", [TransactionId]),
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Error occured when deleting transaction ~s for account ~s: ~B - ~s", [TransactionId, AccountId, Code, Description]),
           system_error
       end;
     _ ->
@@ -372,15 +392,15 @@ delete_transaction_tags(TransactionId) ->
               case Result3 of
                 {ok, void} ->
                   ok;
-                {error, _} ->
-                  lager:log(error, self(), "Error occured when deleting tags for transaction ~s", [TransactionId]),
+                {error, {Code, Description, _}} ->
+                  lager:log(error, self(), "Error occured when deleting tags for transaction ~s: ~B - ~s", [TransactionId, Code, Description]),
                   system_error
               end;
             Error ->
               Error
           end;
-        {error, _} ->
-          lager:log(error, self(), "Error occured when fetching tags for transaction ~s", [TransactionId]),
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Error occured when fetching tags for transaction ~s: ~B - ~s", [TransactionId, Code, Description]),
           system_error
       end;
     _ ->
@@ -399,8 +419,8 @@ delete_transaction_for_tag([H | T], TransactionId) ->
       case Result of
         {ok, void} ->
           delete_transaction_for_tag(T, TransactionId);
-        {error, _} ->
-          lager:log(error, self(), "Error occured when deleting tag ~s for transaction ~s", [Tag, TransactionId]),
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Error occured when deleting tag ~s for transaction ~s: ~B - ~s", [Tag, TransactionId, Code, Description]),
           system_error
       end;
     _ ->
@@ -436,7 +456,8 @@ add_account(Name, Type, StartBalance, Currency, UserID) ->
             _ ->
               system_error
           end;
-        _ ->
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem adding account [~s] for user ~s: ~B - ~s", [Name, uuid:uuid_to_string(UserID), Code, Description]),
           system_error
       end;
     _ ->
@@ -455,7 +476,8 @@ insert_user_by_account(UserId, AccountId) ->
       case Result of
         {ok, void} ->
           ok;
-        _ ->
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem adding user ~s to account ~s: ~B - ~s", [uuid:uuid_to_string(UserId), AccountId, Code, Description]),
           system_error
       end;
     _ ->
@@ -474,7 +496,8 @@ insert_account_by_user(AccountId, UserId) ->
       case Result of
         {ok, void} ->
           ok;
-        _ ->
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem adding account ~s to user ~s: ~B - ~s", [AccountId, uuid:uuid_to_string(UserId), Code, Description]),
           system_error
       end;
     _ ->
@@ -500,7 +523,8 @@ check_account_auth(ClientId, AccountId) ->
                     denied
                 end
             end;
-          _ ->
+          {error, {Code, Description, _}} ->
+            lager:log(error, self(), "Problem checking account access ~s to user ~s: ~B - ~s", [AccountId, uuid:uuid_to_string(ClientId), Code, Description]),
             system_error
         end;
       _ ->
@@ -509,10 +533,3 @@ check_account_auth(ClientId, AccountId) ->
   catch
     exit:badarg -> not_found
   end.
-
-
-
-
-
-
-

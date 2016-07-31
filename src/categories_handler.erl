@@ -74,7 +74,8 @@ get_json(Req, State) ->
       end;
     _ ->
       lager:log(error, self(), "A problem occurred when fetching categories for user ~s", [uuid:uuid_to_string(ClientId)]),
-      {false, Req, State}
+      cowboy_req:reply(500, Req),
+      {halt, Req, State}
   end.
 
 prepare_category_dictionary([], Dict) ->
