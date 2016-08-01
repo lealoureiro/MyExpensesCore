@@ -24,8 +24,10 @@ start(_Type, _Args) ->
     ]}
   ]),
   lager:log(info, self(), "Starting HTTP Server... ~n"),
+  Properties = application:get_all_env(cowboy),
+  Port = proplists:get_value(port, Properties),
   {ok, _} = cowboy:start_http(http, 100, [
-    {port, 8081}
+    {port, Port}
   ],
     [
       {env, [{dispatch, Dispatch}]},
