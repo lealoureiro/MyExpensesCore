@@ -10,13 +10,13 @@
 -author("leandroloureiro").
 
 %% API
--export([init/3]).
--export([content_types_provided/2]).
--export([allowed_methods/2]).
--export([content_types_accepted/2]).
--export([get_json/2]).
--export([process_post/2]).
--export([delete_resource/2]).
+-export([init/3,
+  content_types_provided/2,
+  allowed_methods/2,
+  content_types_accepted/2,
+  get_json/2,
+  process_post/2,
+  delete_resource/2]).
 
 
 init(_Transport, _Req, []) ->
@@ -36,7 +36,7 @@ get_json(Req, State) ->
   case cowboy_req:header(<<"authkey">>, Req) of
     {undefined, _} ->
       lager:log(info, self(), "Request Key missing!"),
-      cowboy_req:reply(400, [{<<"connection">>, <<"close">>}], Req),
+      cowboy_req:reply(400, Req),
       {halt, Req, State};
     {Token, _} ->
       lager:log(info, self(), "Client getting information for key ~s", [Token]),
@@ -64,7 +64,7 @@ process_post(Req, State) ->
       invalid_password ->
         cowboy_req:reply(401, [{<<"connection">>, <<"close">>}], Req1),
         {halt, Req1, State};
-      error ->
+      system_error ->
         lager:log(info, self(), "Problem to create Key for user ~s~n", [Username]),
         {false, Req, State};
       {Key, Id, Name} ->
@@ -78,6 +78,7 @@ process_post(Req, State) ->
       lager:log(info, self(), "Problem parsing the request!"),
       {false, Req, State}
   end.
+
 
 delete_resource(Req, State) ->
   lager:log(info, self(), "Requested delete Key ~n"),

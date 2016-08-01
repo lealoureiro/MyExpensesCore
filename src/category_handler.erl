@@ -10,11 +10,11 @@
 -author("leandro").
 
 %% API
--export([init/3]).
--export([allowed_methods/2]).
--export([is_authorized/2]).
--export([resource_exists/2]).
--export([delete_resource/2]).
+-export([init/3,
+  allowed_methods/2,
+  is_authorized/2,
+  resource_exists/2,
+  delete_resource/2]).
 
 init(_Transport, _Req, []) ->
   {upgrade, protocol, cowboy_rest}.

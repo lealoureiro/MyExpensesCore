@@ -10,13 +10,13 @@
 -author("leandro").
 
 %% API
--export([init/3]).
--export([allowed_methods/2]).
--export([allow_missing_post/2]).
--export([is_authorized/2]).
--export([resource_exists/2]).
--export([content_types_accepted/2]).
--export([process_post/2]).
+-export([init/3,
+  allowed_methods/2,
+  allow_missing_post/2,
+  is_authorized/2,
+  resource_exists/2,
+  content_types_accepted/2,
+  process_post/2]).
 
 
 init(_Transport, _Req, []) ->
@@ -30,6 +30,7 @@ allow_missing_post(Req, State) ->
 
 content_types_accepted(Req, State) ->
   {[{<<"application/json">>, process_post}], Req, State}.
+
 
 is_authorized(Req, State) ->
   case cowboy_req:header(<<"authkey">>, Req) of

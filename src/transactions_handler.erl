@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @author leandro
+%%% @author Leandro Loureiro
 %%% @copyright (C) 2016
 %%% @doc
 %%%
@@ -10,13 +10,13 @@
 -author("leandro").
 
 %% API
--export([init/3]).
--export([allowed_methods/2]).
--export([is_authorized/2]).
--export([content_types_provided/2]).
--export([content_types_accepted/2]).
--export([get_json/2]).
--export([process_post/2]).
+-export([init/3,
+  allowed_methods/2,
+  is_authorized/2,
+  content_types_provided/2,
+  content_types_accepted/2,
+  get_json/2,
+  process_post/2]).
 
 init(_Transport, _Req, []) ->
   {upgrade, protocol, cowboy_rest}.
@@ -29,6 +29,7 @@ content_types_provided(Req, State) ->
 
 content_types_accepted(Req, State) ->
   {[{<<"application/json">>, process_post}], Req, State}.
+
 
 is_authorized(Req, State) ->
   case cowboy_req:header(<<"authkey">>, Req) of
@@ -55,17 +56,18 @@ is_authorized(Req, State) ->
 get_json(Req, State) ->
   {ClientId, _Req2} = cowboy_req:meta(<<"clientId">>, Req),
   {AccountId, _Req3} = cowboy_req:meta(<<"accountId">>, Req),
-  lager:log(info, self(), "Client ~s requested transactions for account ~s~n", [uuid:uuid_to_string(ClientId), AccountId]),
+  lager:log(info, self(), "Client ~s requested transactions for account ~s", [uuid:uuid_to_string(ClientId), AccountId]),
   get_account_transactions(AccountId, Req, State).
 
 get_account_transactions(AccountId, Req, State) ->
   Transactions = expenses_library:get_account_transactions(AccountId),
   case Transactions of
     not_found ->
-      cowboy_req:reply(404, [{<<"connection">>, <<"close">>}], Req),
+      cowboy_req:reply(404, Req),
       {halt, Req, State};
     system_error ->
-      cowboy_req:reply(500, [{<<"connection">>, <<"close">>}], Req),
+      lager:log(error, self(), "Failed to get transactions for account ~s", [AccountId]),
+      cowboy_req:reply(500, Req),
       {halt, Req, State};
     [_ | _] ->
       Mapping = fun(Transaction) ->
