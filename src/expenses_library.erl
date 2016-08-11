@@ -28,6 +28,7 @@
   check_account_auth/2,
   get_client_accounts/1,
   add_account/5,
+  delete_account/2,
   get_account_info/1,
   get_account_transactions_balance/1,
   get_account_transactions/1
@@ -489,10 +490,7 @@ insert_account_by_user(AccountId, UserId) ->
     {ok, Client} ->
       Result = cqerl:run_query(Client, #cql_query{
         statement = <<"INSERT INTO accounts_by_user (user_id,account_id) VALUES (?,?)">>,
-        values = [
-          {user_id, UserId},
-          {account_id, AccountId}
-        ]}),
+        values = [{user_id, UserId}, {account_id, AccountId}]}),
       case Result of
         {ok, void} ->
           ok;
@@ -503,6 +501,72 @@ insert_account_by_user(AccountId, UserId) ->
     _ ->
       system_error
   end.
+
+
+delete_account(UserId, AccountId) ->
+  Result = delete_all_account_transactions(get_account_transactions(AccountId), AccountId),
+  case Result of
+    ok ->
+      case cqerl:get_client({}) of
+        {ok, Client} ->
+          case cqerl:run_query(Client, #cql_query{statement = <<"DELETE FROM accounts WHERE account_id = ?">>, values = [{account_id, AccountId}]}) of
+            {ok, void} ->
+              delete_account_indexes(UserId, AccountId);
+            {error, {Code, Description, _}} ->
+              lager:log(error, self(), "Problem deleting account ~s: ~B - ~s", [AccountId, Code, Description]),
+              system_error
+          end;
+        _ ->
+          system_error
+      end;
+    _ ->
+      Result
+  end.
+
+delete_account_indexes(UserId, AccountId) ->
+  case cqerl:get_client({}) of
+    {ok, Client} ->
+      case cqerl:run_query(Client, #cql_query{statement = <<"DELETE FROM user_by_account WHERE account_id = ?">>, values = [{account_id, AccountId}]}) of
+        {ok, void} ->
+          case cqerl:run_query(Client, #cql_query{statement = <<"DELETE FROM accounts_by_user WHERE user_id = ? AND account_id = ?">>, values = [{user_id, UserId}, {account_id, AccountId}]}) of
+            {ok, void} ->
+              ok;
+            {error, {Code, Description, _}} ->
+              lager:log(error, self(), "Problem deleting account by user index ~s: ~B - ~s", [AccountId, Code, Description]),
+              system_error
+          end;
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem deleting user by account index ~s: ~B - ~s", [AccountId, Code, Description]),
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
+
+
+delete_all_account_transactions(Transactions, _) when is_atom(Transactions) ->
+  Transactions;
+
+delete_all_account_transactions(Transactions, AccountId) when is_list(Transactions) ->
+  DeleteSingleTransaction = fun(Transaction) ->
+    TransactionId = proplists:get_value(transaction_id, Transaction),
+    Datetime = proplists:get_value(date, Transaction),
+    case delete_transaction(AccountId, TransactionId, Datetime) of
+      ok ->
+        1;
+      _ ->
+        0
+    end
+                            end,
+  Size = length(Transactions),
+  Success = lists:sum(lists:map(DeleteSingleTransaction, Transactions)),
+  if
+    Size == Success -> ok;
+    true ->
+      system_error
+  end.
+
+
 
 check_account_auth(ClientId, AccountId) ->
   try
