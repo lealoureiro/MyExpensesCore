@@ -4,4 +4,4 @@ rm -rf _rel
 rm -rf deps
 rm -rf .erlang.mk
 make
-cp ./deploy/sys.config ./_rel/releases/0.1.0/sys.config
+cp ./deploy/sys.config ./_rel/expenses_gateway/releases/0.1.0/sys.config
