@@ -60,7 +60,9 @@ get_json(Req, State) ->
   get_account_transactions(AccountId, Req, State).
 
 get_account_transactions(AccountId, Req, State) ->
-  Transactions = expenses_library:get_account_transactions(AccountId),
+  {Start, _} = cowboy_req:qs_val(<<"start">>, Req, 0),
+  {End, _} = cowboy_req:qs_val(<<"end">>, Req, erlang:system_time(milli_seconds)),
+  Transactions = expenses_library:get_account_transactions(AccountId, Start, End),
   case Transactions of
     not_found ->
       cowboy_req:reply(404, Req),

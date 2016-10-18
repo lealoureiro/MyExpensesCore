@@ -31,16 +31,33 @@
   delete_account/2,
   get_account_info/1,
   get_account_transactions_balance/1,
-  get_account_transactions/1
+  get_account_transactions/3
 ]).
 
+get_account_transactions(AccountId, Start, End) when is_binary(Start) ->
+  case string:to_integer(binary_to_list(Start)) of
+    {error, _} ->
+      lager:log(warning, self(), "Invalid start argument when fetching transactions for account ~s", [AccountId]),
+      system_error;
+    {StartDate, _} ->
+      get_account_transactions(AccountId, StartDate, End)
+  end;
 
-get_account_transactions(AccountId) ->
+get_account_transactions(AccountId, Start, End) when is_binary(End) ->
+  case string:to_integer(binary_to_list(End)) of
+    {error, _} ->
+      lager:log(warning, self(), "Invalid end argument when fetching transactions for account ~s", [AccountId]),
+      system_error;
+    {EndDate, _} ->
+      get_account_transactions(AccountId, Start, EndDate)
+  end;
+
+get_account_transactions(AccountId, Start, End) when is_integer(Start), is_integer(End) ->
   try
     AccountIdUUID = uuid:string_to_uuid(AccountId),
     case cqerl:get_client({}) of
       {ok, Client} ->
-        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT transaction_id,date,description,amount,category,sub_category,external_reference FROM transactions WHERE account_id = ?;">>, values = [{account_id, AccountIdUUID}]}) of
+        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT transaction_id,date,description,amount,category,sub_category,external_reference FROM transactions WHERE account_id = ? AND date > :start_date AND date < :end_date">>, values = [{account_id, AccountIdUUID}, {start_date, Start}, {end_date, End}], page_size = 50000}) of
           {ok, Result} ->
             cqerl:all_rows(Result);
           {error, {Code, Description, _}} ->
@@ -504,7 +521,7 @@ insert_account_by_user(AccountId, UserId) ->
 
 
 delete_account(UserId, AccountId) ->
-  Result = delete_all_account_transactions(get_account_transactions(AccountId), AccountId),
+  Result = delete_all_account_transactions(get_account_transactions(AccountId, 0, erlang:system_time(milli_seconds)), AccountId),
   case Result of
     ok ->
       case cqerl:get_client({}) of
