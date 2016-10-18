@@ -44,7 +44,7 @@ CREATE TABLE transactions (
     date timestamp,
     amount bigint,
     external_reference text,
-    PRIMARY KEY (account_id, date, transaction_id, amount)
+    PRIMARY KEY (account_id, date, transaction_id)
 ) WITH CLUSTERING ORDER BY (date DESC);
 
 CREATE TABLE tags_by_transaction (
