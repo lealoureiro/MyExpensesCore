@@ -57,7 +57,7 @@ get_account_transactions(AccountId, Start, End) when is_integer(Start), is_integ
     AccountIdUUID = uuid:string_to_uuid(AccountId),
     case cqerl:get_client({}) of
       {ok, Client} ->
-        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT transaction_id,date,description,amount,category,sub_category,external_reference FROM transactions WHERE account_id = ? AND date > :start_date AND date < :end_date">>, values = [{account_id, AccountIdUUID}, {start_date, Start}, {end_date, End}], page_size = 50000}) of
+        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT transaction_id,date,description,amount,category,sub_category,external_reference FROM transactions WHERE account_id = ? AND date >= :start_date AND date <= :end_date">>, values = [{account_id, AccountIdUUID}, {start_date, Start}, {end_date, End}], page_size = 50000}) of
           {ok, Result} ->
             cqerl:all_rows(Result);
           {error, {Code, Description, _}} ->
