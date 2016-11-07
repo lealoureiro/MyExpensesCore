@@ -79,3 +79,10 @@ CREATE TABLE transactions_by_external (
 	external_reference text PRIMARY KEY,
 	transaction_id uuid
 );
+
+CREATE TABLE user_tags (
+    user_id uuid,
+    tag text,
+    default boolean,
+    PRIMARY KEY (user_id, tag)
+);
