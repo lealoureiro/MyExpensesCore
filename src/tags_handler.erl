@@ -59,7 +59,7 @@ get_json(Req, State) ->
       Map = fun(Tag) ->
         TagName = proplists:get_value(tag, Tag),
         Default = proplists:get_value(default, Tag),
-        {[{<<"tag">>, TagName}, {<<"default">>, Default}]}
+        {[{<<"name">>, TagName}, {<<"defaultSelected">>, Default}]}
             end,
       Data = lists:map(Map, Tags),
       JSON = jiffy:encode(Data),
@@ -76,11 +76,11 @@ process_put(Req, State) ->
   {ClientId, _} = cowboy_req:meta(<<"clientId">>, Req),
   {ok, Body, _} = cowboy_req:body(Req),
   {Data} = jiffy:decode(Body),
-  Valid = proplists:is_defined(<<"name">>, Data) and proplists:is_defined(<<"default">>, Data),
+  Valid = proplists:is_defined(<<"name">>, Data) and proplists:is_defined(<<"defaultSelected">>, Data),
   case Valid of
     true ->
       TagName = proplists:get_value(<<"name">>, Data),
-      Default = proplists:get_value(<<"default">>, Data),
+      Default = proplists:get_value(<<"defaultSelected">>, Data),
       lager:log(info, self(), "Client ~s adding new tag ~s~n", [uuid:uuid_to_string(ClientId), TagName]),
       case expenses_library:add_tag(ClientId, TagName, Default) of
         ok ->
