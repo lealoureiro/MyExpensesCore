@@ -20,7 +20,9 @@ start(_Type, _Args) ->
       {"/categories/", categories_handler, []},
       {"/categories/:categoryName", category_handler, []},
       {"/categories/:categoryName/subcategories/", sub_categories_handler, []},
-      {"/categories/:categoryName/subcategories/:subCategoryName", sub_category_handler, []}
+      {"/categories/:categoryName/subcategories/:subCategoryName", sub_category_handler, []},
+      {"/tags/", tags_handler, []},
+      {"/tags/:tag", tag_handler, []}
     ]}
   ]),
   lager:log(info, self(), "Starting HTTP Server... ~n"),

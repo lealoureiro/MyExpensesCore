@@ -31,7 +31,12 @@
   delete_account/2,
   get_account_info/1,
   get_account_transactions_balance/1,
-  get_account_transactions/3
+  get_account_transactions/3,
+
+  get_tags/1,
+  add_tag/3,
+  verify_tag/2,
+  delete_tag/2
 ]).
 
 get_account_transactions(AccountId, Start, End) when is_binary(Start) ->
@@ -584,7 +589,6 @@ delete_all_account_transactions(Transactions, AccountId) when is_list(Transactio
   end.
 
 
-
 check_account_auth(ClientId, AccountId) ->
   try
     AccountIdUUID = uuid:string_to_uuid(AccountId),
@@ -613,4 +617,73 @@ check_account_auth(ClientId, AccountId) ->
     end
   catch
     exit:badarg -> not_found
+  end.
+
+get_tags(ClientId) ->
+  case cqerl:get_client({}) of
+    {ok, Client} ->
+      case cqerl:run_query(Client, #cql_query{statement = <<"SELECT tag, default FROM user_tags WHERE user_id = ?">>, values = [{user_id, ClientId}]}) of
+        {ok, Result} ->
+          cqerl:all_rows(Result);
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem fetching tags for user ~s: ~B - ~s", [uuid:uuid_to_string(ClientId), Code, Description]),
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
+
+add_tag(ClientId, Tag, Default) ->
+  case cqerl:get_client({}) of
+    {ok, Client} ->
+      Result = cqerl:run_query(Client, #cql_query{
+        statement = <<"INSERT INTO user_tags (user_id,tag, default) VALUES (?,?,?)">>,
+        values = [{user_id, ClientId}, {tag, Tag}, {default, Default}]}),
+      case Result of
+        {ok, void} ->
+          ok;
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem adding tag ~s for user ~s: ~B - ~s", [Tag, uuid:uuid_to_string(ClientId), Code, Description]),
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
+
+verify_tag(ClientId, Tag) ->
+  case cqerl:get_client({}) of
+    {ok, Client} ->
+      Result = cqerl:run_query(Client, #cql_query{statement = "SELECT tag FROM user_tags WHERE user_id = ? AND tag = ?",
+        values = [{user_id, ClientId}, {tag, Tag}]}),
+      case Result of
+        {ok, Data} ->
+          Tags = cqerl:all_rows(Data),
+          case Tags of
+            [] ->
+              false;
+            [_] ->
+              true
+          end;
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem fetching tag ~s for user ~s: ~B - ~s", [Tag, uuid:uuid_to_string(ClientId), Code, Description]),
+          system_error
+      end;
+    _ ->
+      system_error
+  end.
+
+delete_tag(ClientId, Tag) ->
+  case cqerl:get_client({}) of
+    {ok, Client} ->
+      Result = cqerl:run_query(Client, #cql_query{statement = <<"DELETE FROM user_tags WHERE user_id = ? AND tag = ?">>,
+        values = [{user_id, ClientId}, {tag, Tag}]}),
+      case Result of
+        {ok, void} ->
+          true;
+        {error, {Code, Description, _}} ->
+          lager:log(error, self(), "Problem deleting tag ~s for user ~s: ~B - ~s", [Tag, uuid:uuid_to_string(ClientId), Code, Description]),
+          false
+      end;
+    _ ->
+      system_error
   end.
