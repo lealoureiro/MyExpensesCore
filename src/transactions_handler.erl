@@ -131,5 +131,8 @@ process_post(Req, State) ->
   catch
     throw:{error, _} ->
       lager:log(info, self(), "Client ~s sending bad request for new transaction~n", [uuid:uuid_to_string(ClientId)]),
+      {false, Req, State};
+    error:_ ->
+      lager:log(info, self(), "Client ~s sending invalid data for new transaction~n", [uuid:uuid_to_string(ClientId)]),
       {false, Req, State}
   end.
