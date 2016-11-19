@@ -111,8 +111,9 @@ process_post(Req, State) ->
         Amount = proplists:get_value(<<"amount">>, Data),
         Timestamp = proplists:get_value(<<"timestamp">>, Data),
         Tags = proplists:get_value(<<"tags">>, Data),
-        TagsList = string:tokens(binary_to_list(Tags), ","),
-        Result = expenses_library:add_transaction(AccountId, Description, Category, SubCategory, Amount, Timestamp, TagsList),
+        Mapping = fun(Tag) -> binary_to_list(Tag) end,
+        Tags2 = lists:map(Mapping, Tags),
+        Result = expenses_library:add_transaction(AccountId, Description, Category, SubCategory, Amount, Timestamp, Tags2),
         case Result of
           {ok, TransactionId} ->
             Output = {[{<<"id">>, TransactionId}]},
@@ -130,8 +131,5 @@ process_post(Req, State) ->
   catch
     throw:{error, _} ->
       lager:log(info, self(), "Client ~s sending bad request for new transaction~n", [uuid:uuid_to_string(ClientId)]),
-      {false, Req, State};
-    error:_ ->
-      lager:log(info, self(), "Client ~s sending invalid data for new transaction~n", [uuid:uuid_to_string(ClientId)]),
       {false, Req, State}
   end.
