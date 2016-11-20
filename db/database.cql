@@ -43,15 +43,9 @@ CREATE TABLE transactions (
     sub_category text,
     date timestamp,
     amount bigint,
-    external_reference text,
+    tags set<text>,
     PRIMARY KEY (account_id, date, transaction_id)
 ) WITH CLUSTERING ORDER BY (date DESC);
-
-CREATE TABLE tags_by_transaction (
-      transaction_id uuid,
-      tag text,
-      PRIMARY KEY (transaction_id, tag)
-);
 
 CREATE TABLE transactions_by_tag (
     tag text,
