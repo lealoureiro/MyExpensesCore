@@ -79,13 +79,7 @@ get_account_transactions(AccountId, Req, State) ->
         SubCtgId = proplists:get_value(sub_category, Transaction),
         Datetime = proplists:get_value(date, Transaction),
         Amt = proplists:get_value(amount, Transaction),
-        ExtRef = proplists:get_value(external_reference, Transaction),
-        case ExtRef of
-          undefined ->
-            {[{<<"id">>, Id}, {<<"description">>, Description}, {<<"category">>, CtgID}, {<<"subCategory">>, SubCtgId}, {<<"timestamp">>, Datetime}, {<<"amount">>, Amt}, {<<"externalReference">>, null}]};
-          _ ->
-            {[{<<"id">>, Id}, {<<"description">>, Description}, {<<"category">>, CtgID}, {<<"subCategory">>, SubCtgId}, {<<"timestamp">>, Datetime}, {<<"amount">>, Amt}, {<<"externalReference">>, ExtRef}]}
-        end
+        {[{<<"id">>, Id}, {<<"description">>, Description}, {<<"category">>, CtgID}, {<<"subCategory">>, SubCtgId}, {<<"timestamp">>, Datetime}, {<<"amount">>, Amt}]}
                 end,
       Data = lists:map(Mapping, Transactions),
       JSON = jiffy:encode(Data),

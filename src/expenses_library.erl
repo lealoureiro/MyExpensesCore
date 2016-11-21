@@ -62,7 +62,7 @@ get_account_transactions(AccountId, Start, End) when is_integer(Start), is_integ
     AccountIdUUID = uuid:string_to_uuid(AccountId),
     case cqerl:get_client({}) of
       {ok, Client} ->
-        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT transaction_id,date,description,amount,category,sub_category,external_reference FROM transactions WHERE account_id = ? AND date >= :start_date AND date <= :end_date">>, values = [{account_id, AccountIdUUID}, {start_date, Start}, {end_date, End}], page_size = 50000}) of
+        case cqerl:run_query(Client, #cql_query{statement = <<"SELECT transaction_id,date,description,amount,category,sub_category FROM transactions WHERE account_id = ? AND date >= :start_date AND date <= :end_date">>, values = [{account_id, AccountIdUUID}, {start_date, Start}, {end_date, End}], page_size = 50000}) of
           {ok, Result} ->
             cqerl:all_rows(Result);
           {error, {Code, Description, _}} ->
@@ -298,8 +298,8 @@ add_transaction(AccountId, Description, Category, SubCategory, Amount, Timestamp
     {ok, Client} ->
       Result = cqerl:run_query(Client, #cql_query{
         statement = <<"INSERT INTO transactions
-          (transaction_id,date,account_id,amount,description,category,sub_category)
-          VALUES (?, ?, ?, ?, ?, ?, ?)">>,
+          (transaction_id,date,account_id,amount,description,category,sub_category,tags)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)">>,
         values = [
           {transaction_id, TransactionId},
           {account_id, AccountIdUUID},
@@ -307,7 +307,8 @@ add_transaction(AccountId, Description, Category, SubCategory, Amount, Timestamp
           {amount, Amount},
           {date, Timestamp},
           {category, Category},
-          {sub_category, SubCategory}
+          {sub_category, SubCategory},
+          {tags, Tags}
         ]
       }),
       case Result of
@@ -336,24 +337,14 @@ add_tag_to_transaction(TransactionId, Tag) when is_list(Tag) ->
   case cqerl:get_client({}) of
     {ok, Client} ->
       Result = cqerl:run_query(Client,
-        #cql_query{statement = <<"INSERT INTO tags_by_transaction (transaction_id,tag) VALUES (?,?)">>,
+        #cql_query{statement = <<"INSERT INTO transactions_by_tag (transaction_id,tag) VALUES (?,?)">>,
           values = [{transaction_id, TransactionId}, {tag, Tag}]}
       ),
       case Result of
         {ok, void} ->
-          Result2 = cqerl:run_query(Client,
-            #cql_query{statement = <<"INSERT INTO transactions_by_tag (transaction_id,tag) VALUES (?,?)">>,
-              values = [{transaction_id, TransactionId}, {tag, Tag}]}
-          ),
-          case Result2 of
-            {ok, void} ->
-              ok;
-            {error, {Code, Description, _}} ->
-              lager:log(error, self(), "Failed to add transaction [~s] to tag [~s]: ~B - ~s", [TransactionId, Tag, Code, Description]),
-              system_error
-          end;
+          ok;
         {error, {Code, Description, _}} ->
-          lager:log(error, self(), "Failed to add tag [~s] to transaction [~s]: ~B - ~s", [Tag, TransactionId, Code, Description]),
+          lager:log(error, self(), "Failed to add transaction [~s] to tag [~s]: ~B - ~s", [TransactionId, Tag, Code, Description]),
           system_error
       end;
     _ ->
@@ -387,56 +378,35 @@ verify_transaction(AccountId, TransactionId, Timestamp) ->
 delete_transaction(AccountId, TransactionId, Timestamp) ->
   case cqerl:get_client({}) of
     {ok, Client} ->
-      Result = cqerl:run_query(Client, #cql_query{statement = <<"DELETE FROM transactions WHERE account_id = ? AND date = ? AND transaction_id = ?">>,
-        values = [{account_id, AccountId}, {date, Timestamp}, {transaction_id, TransactionId}]}),
+      Result = cqerl:run_query(Client, #cql_query{statement = <<"SELECT tags FROM transactions WHERE account_id = ? AND date = ? AND transaction_id = ?">>, values = [{account_id, AccountId}, {date, Timestamp}, {transaction_id, TransactionId}]}),
       case Result of
-        {ok, void} ->
-          delete_transaction_tags(TransactionId);
+        {ok, Data} ->
+          Result2 = cqerl:run_query(Client, #cql_query{statement = <<"DELETE FROM transactions WHERE account_id = ? AND date = ? AND transaction_id = ?">>,
+            values = [{account_id, AccountId}, {date, Timestamp}, {transaction_id, TransactionId}]}),
+          case Result2 of
+            {ok, void} ->
+              delete_transaction_for_tag(proplists:get_value(tags, cqerl:head(Data)), TransactionId);
+            {error, {Code, Description, _}} ->
+              lager:log(error, self(), "Error occured when deleting transaction ~s for account ~s: ~B - ~s", [TransactionId, AccountId, Code, Description]),
+              system_error
+          end;
         {error, {Code, Description, _}} ->
-          lager:log(error, self(), "Error occured when deleting transaction ~s for account ~s: ~B - ~s", [TransactionId, AccountId, Code, Description]),
+          lager:log(error, self(), "Error occured when fecthing tags to delete for transaction ~s for account ~s: ~B - ~s", [TransactionId, AccountId, Code, Description]),
           system_error
       end;
     _ ->
       system_error
   end.
 
-delete_transaction_tags(TransactionId) ->
-  case cqerl:get_client({}) of
-    {ok, Client} ->
-      Result = cqerl:run_query(Client, #cql_query{statement = <<"SELECT tag FROM tags_by_transaction WHERE transaction_id = ?">>,
-        values = [{transaction_id, TransactionId}]}),
-      case Result of
-        {ok, Data} ->
-          Result2 = delete_transaction_for_tag(cqerl:all_rows(Data), TransactionId),
-          case Result2 of
-            ok ->
-              Result3 = cqerl:run_query(Client, #cql_query{statement = <<"DELETE FROM tags_by_transaction WHERE transaction_id = ?">>,
-                values = [{transaction_id, TransactionId}]}),
-              case Result3 of
-                {ok, void} ->
-                  ok;
-                {error, {Code, Description, _}} ->
-                  lager:log(error, self(), "Error occured when deleting tags for transaction ~s: ~B - ~s", [TransactionId, Code, Description]),
-                  system_error
-              end;
-            Error ->
-              Error
-          end;
-        {error, {Code, Description, _}} ->
-          lager:log(error, self(), "Error occured when fetching tags for transaction ~s: ~B - ~s", [TransactionId, Code, Description]),
-          system_error
-      end;
-    _ ->
-      system_error
-  end.
+delete_transaction_for_tag(undefined, _) ->
+  ok;
 
 delete_transaction_for_tag([], _) ->
   ok;
 
-delete_transaction_for_tag([H | T], TransactionId) ->
+delete_transaction_for_tag([Tag | T], TransactionId) ->
   case cqerl:get_client({}) of
     {ok, Client} ->
-      Tag = proplists:get_value(tag, H),
       Result = cqerl:run_query(Client, #cql_query{statement = <<"DELETE FROM transactions_by_tag WHERE tag = ? AND transaction_id = ?">>,
         values = [{tag, Tag}, {transaction_id, TransactionId}]}),
       case Result of
