@@ -79,7 +79,8 @@ get_account_transactions(AccountId, Req, State) ->
         SubCtgId = proplists:get_value(sub_category, Transaction),
         Datetime = proplists:get_value(date, Transaction),
         Amt = proplists:get_value(amount, Transaction),
-        {[{<<"id">>, Id}, {<<"description">>, Description}, {<<"category">>, CtgID}, {<<"subCategory">>, SubCtgId}, {<<"timestamp">>, Datetime}, {<<"amount">>, Amt}]}
+        Tags = proplists:get_value(tags, Transaction),
+        {[{<<"id">>, Id}, {<<"description">>, Description}, {<<"category">>, CtgID}, {<<"subCategory">>, SubCtgId}, {<<"timestamp">>, Datetime}, {<<"amount">>, Amt}, {<<"tags">>, Tags}]}
                 end,
       Data = lists:map(Mapping, Transactions),
       JSON = jiffy:encode(Data),
