@@ -49,7 +49,12 @@ startDatabase() ->
 
 custom_on_response(StatusCode, Headers, Body, Req) ->
   Headers2 = lists:keyreplace(<<"server">>, 1, Headers, {<<"server">>, <<"MyExpensesCore Server v0.1.0">>}),
-  {ok, Req2} = cowboy_req:reply(StatusCode, Headers2, Body, Req),
+  Headers3 = lists:append(Headers2, [
+    {<<"Access-Control-Allow-Origin">>, <<"*">>},
+    {<<"Access-Control-Allow-Methods">>, <<"GET, POST, PUT">>},
+    {<<"Access-Control-Allow-Headers">>, <<"Content-Type">>}
+  ]),
+  {ok, Req2} = cowboy_req:reply(StatusCode, Headers3, Body, Req),
   Req2.
 
 
